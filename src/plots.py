@@ -13,6 +13,9 @@ df10['time'] = pd.to_datetime(df10['time'])
 # Useful list of all of the heights, in m, that data exists at
 heights = [6,10,20,32,80,106]
 
+stability_classes = [['unstable'],['neutral'],['stable'],['strongly stable']]
+combined_stability_classes = [['unstable'],['neutral'],['stable','strongly stable']]
+
 def scatter_ri():
     # Plot of Ri over time
     plt.scatter(df10['time'], df10['ri'],s=0.1)
@@ -73,7 +76,6 @@ def plot_temp(height=6):
     plt.scatter(df10['time'], df10[f't_{height}m'],s=1)
     plt.show()
     return
-
 
 def alpha_vs_lapse(d=False):
     df = df10.dropna(subset=['vpt_lapse_env','alpha'],how='any')
@@ -141,9 +143,31 @@ def stratified_speeds():
     plt.show()
     return
 
+def hist_ri():
+    plt.hist(df10[np.abs(df10['ri'])<10]['ri'],bins=100)
+    plt.show()
+    return()
+
+def hist_alpha_by_stability(combine = False, title = True):
+    fig, ax = plt.subplots(figsize = (5.5,4))
+    if title: fig.suptitle(r'$\alpha$ distribution by stability')
+    ax.set_xlabel(r'$\alpha$')
+    ax.set_ylabel('Probability Density')
+    scs = combined_stability_classes if combine else stability_classes
+    for sc in scs:
+        df_restricted = df10[df10['stability'].isin(sc)]
+        ax.hist(df_restricted['alpha'], bins=50, density = True, range = (-0.4, 1.25), alpha=0.5, edgecolor = 'k', label=sc[0].capitalize())
+    ax.legend()
+    plt.show()
+    return
+
 if __name__ == '__main__':
-    stratified_speeds()
-    plot_alpha()
-    alpha_vs_lapse()
-    alpha_vs_ri()
+    #stratified_speeds()
+    #plot_alpha()
+    #alpha_vs_lapse()
+    #alpha_vs_ri()
     #scatter3()
+    #bar_directions()
+    #bar_stability()
+    #hist_ri()
+    hist_alpha_by_stability(combine = True, title = False)

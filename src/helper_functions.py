@@ -56,7 +56,7 @@ def virtual_potential_temperature(RH, P, T):
         # and is valid within ~1% for mixing ratios between roughly 0.00-0.20
     return vpT
 
-def wind_components(speed, direction):
+def wind_components(speed, direction, invert=False):
     # given a wind speed and a direction in degrees CW of N,
     # return u, v (eastward, northward) components of wind
     if math.isnan(direction) or speed == 0.:
@@ -64,6 +64,9 @@ def wind_components(speed, direction):
     direction_rad = np.radians(direction)
     u = speed * np.sin(direction_rad)
     v = speed * np.cos(direction_rad)
+    if invert:
+        u *= -1
+        v *= -1
     return u, v
 
 def polar_wind(u, v):
@@ -191,6 +194,9 @@ def power_fit(xvals, yvals, both=False):
     if both:
         return np.exp(lnA), B
     return B
+
+def seconds(deltatime):
+    return deltatime.days * 24 * 3600 + deltatime.seconds + deltatime.microseconds/1e6
 
 def mytest(u0=1.,v0=1.):
     print(f'u = {u0:.3f}, v = {v0:.3f}')

@@ -1,7 +1,13 @@
 ### sonic.py ###
 # Elliott Walker #
-# Last update: 23 July 2024 #
+# Last update: 25 September 2024 #
 # Analysis of the snippet of sonic data #
+
+# Example usage:
+#   python sonic.py -c -n 8 --data="../../data/KCC_FluxData_106m_SAMPLE/" --target="../outputs/sonic_sample/" --match="../outputs/slow/ten_minutes_labeled.csv" --slow="../outputs/slow/combined.csv"
+#   This uses n=8 processors, clears target directory, and conducts a match with given slow data summary. Alignment by default.
+
+# Note that summary file U, V, W means are pre-alignment, while those logged are post-alignment
 
 import pandas as pd
 import numpy as np
@@ -16,6 +22,7 @@ WINDS = ['Ux','Uy','Uz'] # Columns containing wind speeds, in order
 TEMPERATURE = 'Ts' # Column with sonic temperature for fluxes
 TEMPS_C = ['Ts', 'amb_tmpr'] # Columns containing temperatures in C
 IGNORE = ['H2O', 'CO2', 'amb_tmpr', 'amb_press'] # Columns we don't care about
+COLORS = [f'C{i}' for i in range(7)]
 
 class Logger:
     def __init__(self, logfile = 'output.log', pid = 0):
@@ -276,7 +283,7 @@ def match_alpha(df, # dataframe which we want to match alpha to, based on its st
     return mean_alpha, median_alpha
 
 # Geometrically align the Ux and Uy components of wind such that Ux is oriented in the direction of the mean wind and Uy is in the crosswind direction
-def align_frame(df, components = WINDS[:2]):
+def mean_direction(df, components = WINDS[:2]):
 
     ux = df[components[0]]
     uy = df[components[1]]
@@ -284,6 +291,13 @@ def align_frame(df, components = WINDS[:2]):
     uxavg = np.mean(ux)
     uyavg = np.mean(uy)
     dir_to_align = np.arctan2(uyavg, uxavg)
+
+    return dir_to_align
+
+def align_to_direction(df, dir_to_align, components = WINDS[:2]):
+
+    ux = df[components[0]]
+    uy = df[components[1]]
 
     ux_aligned = ux * np.cos(dir_to_align) + uy * np.sin(dir_to_align)
     uy_aligned = - ux * np.sin(dir_to_align) + uy * np.cos(dir_to_align)
@@ -297,19 +311,26 @@ def align_frame(df, components = WINDS[:2]):
 def plot_data(df,
               title = 'Wind Plot',
               saveto = None,
-              cols = WINDS):
+              cols = WINDS,
+              df_slow = None):
     
     fig, ax = plt.subplots()
     fig.suptitle(title, fontweight = 'bold')
 
     starttime = df.index[0]
     deltatime = df.index - starttime
-    deltaseconds = deltatime.days * 24 * 3600 + deltatime.seconds + deltatime.microseconds/1e6
+    deltaseconds = hf.seconds(deltatime)
 
-    for col in cols:
+    if df_slow is not None:
+        slowtime = df_slow.index - starttime
+        slowseconds = hf.seconds(slowtime)
+
+    for col, color in zip(cols, COLORS):
         if col not in df.columns:
             continue
-        ax.plot(deltaseconds, df[col], label = str(col), linewidth = 1)
+        ax.plot(deltaseconds, df[col], label = str(col), linewidth = 1, c = color)
+        if (df_slow is not None) and col in df_slow.columns:
+            ax.scatter(slowseconds, df_slow[col], s = 20, c = color, edgecolors='black', zorder=10) # overlay slow data
     
     ax.set_ylabel('Wind speed (m/s)')
     ax.set_xlabel(f'Seconds since {starttime}')
@@ -410,7 +431,7 @@ def append_summary(info, filename):
     return
 
 def _analyze_file(args):
-    filename, parent, kelvinconvert, autocols, maxlag, threshold, savedir, df_match, align, savecopy, plotdata, plotautocorrs, saveautocorrs, savescales, plotflux, saveflux, summaryfile, logparent, multiproc = args
+    filename, parent, kelvinconvert, autocols, maxlag, threshold, savedir, df_match, df_slow, align, savecopy, plotdata, plotautocorrs, saveautocorrs, savescales, plotflux, saveflux, summaryfile, logparent, multiproc = args
 
     if multiproc:
         logger = logparent.sublogger()
@@ -433,13 +454,24 @@ def _analyze_file(args):
     time_string = f'Time interval: {starttime} to {endtime}'
     logger.log(time_string)
 
+    if df_slow is not None:
+        # cut to match time interval
+        df_slow['time'] = pd.to_datetime(df_slow['time'])
+        df_slow = df_slow[df_slow['time'].between(starttime, endtime)]
+        df_slow.set_index('time', inplace = True)
+        df_slow[['Ux','Uy']] = df_slow.apply(lambda row: hf.wind_components(row['ws_106m'], row['wd_106m'], invert=True), axis=1, result_type='expand') # convert to east and north components
+        df_slow.drop(columns = ['ws_106m','wd_106m'], inplace=True)
+
     summaryinfo = f'{starttime},{endtime},{df[WINDS[0]].mean():.5f},{df[WINDS[1]].mean():.5f},{df[WINDS[2]].mean():.5f}'
 
     if align:
-        df = align_frame(df)
+        dir_to_align = mean_direction(df) # determine direction of mean wind
+        df = align_to_direction(df, dir_to_align) # align data to direction of mean wind
         logger.log('Aligned data: Ux oriented in direction of mean wind')
+        if df_slow is not None:
+            df_slow = align_to_direction(df_slow, dir_to_align) # also align the slow data to the same direction, if it exists
 
-    if savecopy:
+    if savecopy: # if enabled, save a copy of the aligned filtered data we used
         if align:
             fname = 'aligned_data.csv'
         else:
@@ -448,13 +480,23 @@ def _analyze_file(args):
         df.to_csv(fpath)
         logger.log(f'Copied data to {fpath}')
 
+        if df_slow is not None: # also save a copy of the aligned filtered slow data, if it exists
+            if align:
+                fname = 'aligned_slowdata.csv'
+            else:
+                fname = 'slowdata.csv'
+            fpath = os.path.abspath(os.path.join(intermediate,fname))
+            df_slow.to_csv(fpath)
+            logger.log(f'Copied matching slow data to {fpath}')
+
+
     if plotdata:
         if align:
             fname = 'aligned_data.png'
         else:
             fname = 'data.png'
         fpath = os.path.abspath(os.path.join(intermediate, fname))
-        plot_data(df, title = f'{name} Data', saveto = fpath, cols = WINDS)
+        plot_data(df, title = f'{name} Data', saveto = fpath, cols = WINDS, df_slow = df_slow)
         logger.log(f'Saved wind plots to {fpath}')
 
     alpha_string = None
@@ -534,6 +576,7 @@ def analyze_directory(parent,
                       threshold = 0.25,
                       savedir = '.',
                       matchfile = None,
+                      slowfile = None,
                       align = True,
                       savecopy = True,
                       plotdata = True,
@@ -559,7 +602,7 @@ def analyze_directory(parent,
             if savescales:
                 f.write(',length_scale')
             f.write('\n')
-        logger.log(f'Saving summary information to {summaryfile}')
+        logger.log(f'Saving summary header information to {summaryfile}')
 
     if type(nproc) is int and nproc > 1:
         logger.log(f'MULTIPROCESSING ENABLED: {nproc=}')
@@ -575,7 +618,13 @@ def analyze_directory(parent,
     else:
         df_match = None
 
-    arguments = (parent, kelvinconvert, autocols, maxlag, threshold, savedir, df_match, align, savecopy, plotdata, plotautocorrs, saveautocorrs, savescales, plotflux, saveflux, summaryfile, logger, multiproc)
+    if slowfile:
+        df_slow = pd.read_csv(slowfile)
+        df_slow = df_slow[['time','ws_106m','wd_106m']] # select only the 106m data from the slow file. this does for now require the specific formatting and data height for the slow data.
+    else:
+        df_slow = None
+
+    arguments = (parent, kelvinconvert, autocols, maxlag, threshold, savedir, df_match, df_slow, align, savecopy, plotdata, plotautocorrs, saveautocorrs, savescales, plotflux, saveflux, summaryfile, logger, multiproc)
     directory = [(filename, *arguments) for filename in os.listdir(parent)]
 
     pool = multiprocessing.Pool(processes = nproc)
@@ -596,6 +645,8 @@ def _confirm(message):
     return False
 
 if __name__ == '__main__':
+    # Handle CL args
+
     import argparse
 
     parser = argparse.ArgumentParser(
@@ -608,11 +659,13 @@ if __name__ == '__main__':
     parser.add_argument('-d', '--data', default = '../../data/KCC_FluxData_106m_SAMPLE', help = 'input data directory')
     parser.add_argument('-t', '--target', default = '../outputs/sonic_sample',  help = 'output target directory')
     parser.add_argument('-m', '--match', default = '../outputs/slow/ten_minutes_lapibeled.csv', help = 'file containing bulk Ri to match')
+    parser.add_argument('-s', '--slow', default = '../outputs/slow/combined.csv', help = 'file containing slow data to match')
     parser.add_argument('--nomatch', action = 'store_true', help = 'do not perform Ri match?')
+    parser.add_argument('--noslow', action = 'store_true', help = 'do not plot slow data?')
     parser.add_argument('--noflux', action = 'store_true', help = 'do not perform flux calculations?')
     parser.add_argument('--noalign', action = 'store_true', help = 'do not geometrically align Ux in the direction of the mean horizontal wind?')
     parser.add_argument('-n', '--nproc', default = 1, help = 'number of CPUs to run; sets verbose to False')
-    parser.add_argument('-s', '--silent', action = 'store_true', help = 'neither print nor log?')
+    parser.add_argument('-q', '--silent', action = 'store_true', help = 'neither print nor log?')
     group = parser.add_mutually_exclusive_group()
     group.add_argument('-v', '--verbose', action = 'store_true', help = 'print to standard output instead of logging?')
     group.add_argument('-l', '--logfile', help = 'file to log to')
@@ -621,10 +674,12 @@ if __name__ == '__main__':
 
     align = not args.noalign
     nomatch = args.nomatch
+    noslow = args.noslow
     flux = not args.noflux
     parent = args.data
     savedir = args.target
     matchfile = args.match
+    slowfile = args.slow
 
     if '/' not in savedir:
         savedir = f'./{savedir}'
@@ -632,21 +687,28 @@ if __name__ == '__main__':
         parent = f'./{parent}'
     if '/' not in matchfile:
         matchfile = f'./{matchfile}'
+    if '/' not in slowfile:
+        slowfile = f'./{slowfile}'
 
     savedir = os.path.abspath(savedir)
     parent = os.path.abspath(parent)
     matchfile = os.path.abspath(matchfile)
+    slowfile = os.path.abspath(slowfile)
 
     if not os.path.exists(parent):
         raise OSError(f'Data directory {parent} not found, exiting.')
     if not os.path.exists(matchfile):
         nomatch = True
+    if not os.path.exists(slowfile):
+        noslow = True
 
     verbose = args.verbose
     if int(args.nproc) > 1 or args.silent: verbose = False
 
     if nomatch:
         matchfile = None
+    if noslow:
+        slowfile = None
 
     if args.clear:
         if os.path.exists(savedir):
@@ -675,10 +737,12 @@ if __name__ == '__main__':
         flux = False
         logger.log('Warning - noalign is True, so flux calculations will not be carried out.')
 
+    # Conduct the analysis with all of the options set
     analyze_directory(parent = parent,
                       maxlag = 0.5,
                       threshold = 0.5,
                       matchfile = matchfile,
+                      slowfile = slowfile,
                       align = align,
                       savedir = savedir,
                       plotflux = flux,

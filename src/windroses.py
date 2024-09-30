@@ -7,7 +7,7 @@ import os
 import math
 
 # Default bins
-DEFAULT_BINS = [0.89,2.24,3.13,4.47,6.71,8.94]
+DEFAULT_BINS = [0,0.89,2.24,3.13,4.47,6.71,8.94]
 # Heights at which data is found, ignoring 80m because we want a good year-round picture
 HEIGHTS = [6,10,20,32,106]
 
@@ -76,7 +76,7 @@ def full_rose(df, which_heights=HEIGHTS, bins=DEFAULT_BINS, saveto=None, transpa
     plt.close()
     return
 
-def generate_roses(df, directory='plots/windroses', transparent=False):
+def generate_roses(df, directory='../outputs/windroses', transparent=False):
     print('Generating all windroses.')
     print('Year round...')
     fulldir = directory+'/all/'
