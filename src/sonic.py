@@ -245,17 +245,24 @@ def save_scales(scales,
 
     return
 
+def slicematch(df, df_match):
+
+    start_time = df.index[0]
+    end_time = df.index[-1]
+
+    dfr = df_match.reset_index()
+    dfr['time'] = pd.to_datetime(dfr['time'])
+    sliced = dfr[dfr['time'].between(start_time,end_time)]
+
+    return sliced
+
+# Match bulk Richardson number
 def match_ri(df, # dataframe which we want to match ri to, based on its start & end times
              df_ri, # dataframe containing ri values
              where = 'ri' # Ri column name
              ):
 
-    start_time = df.index[0]
-    end_time = df.index[-1]
-
-    dfr = df_ri.reset_index()
-    dfr['time'] = pd.to_datetime(dfr['time'])
-    sliced = dfr[dfr['time'].between(start_time,end_time)]
+    sliced = slicematch(df, df_ri)
 
     mean_ri = sliced[where].mean()
     median_ri = sliced[where].median()
@@ -265,22 +272,31 @@ def match_ri(df, # dataframe which we want to match ri to, based on its start & 
 
     return mean_ri, median_ri, stability
 
+# Match computed alpha values
 def match_alpha(df, # dataframe which we want to match alpha to, based on its start & end times
              df_alpha, # dataframe containing alpha values
              where = 'alpha' # wind shear exponent column name
              ):
 
-    start_time = df.index[0]
-    end_time = df.index[-1]
-
-    dfr = df_alpha.reset_index()
-    dfr['time'] = pd.to_datetime(dfr['time'])
-    sliced = dfr[dfr['time'].between(start_time,end_time)]
+    sliced = slicematch(df, df_alpha)
 
     mean_alpha = sliced[where].mean()
     median_alpha = sliced[where].median()
 
     return mean_alpha, median_alpha
+
+# Match vpt lapse rate (vertical gradient of vpt, a static stability indicator)
+def match_lapse(df,
+                 df_lapse,
+                 where = 'vpt_lapse_env'
+                 ):
+    
+    sliced = slicematch(df, df_lapse)
+
+    mean_lapse = sliced[where].mean()
+    median_lapse = sliced[where].median()
+
+    return mean_lapse, median_lapse
 
 # Geometrically align the Ux and Uy components of wind such that Ux is oriented in the direction of the mean wind and Uy is in the crosswind direction
 def mean_direction(df, components = WINDS[:2]):
@@ -461,6 +477,7 @@ def _analyze_file(args):
         df_slow.set_index('time', inplace = True)
         df_slow[['Ux','Uy']] = df_slow.apply(lambda row: hf.wind_components(row['ws_106m'], row['wd_106m'], invert=True), axis=1, result_type='expand') # convert to east and north components
         df_slow.drop(columns = ['ws_106m','wd_106m'], inplace=True)
+        logger.log('Matched corresponding slow data at 106m')
 
     summaryinfo = f'{starttime},{endtime},{df[WINDS[0]].mean():.5f},{df[WINDS[1]].mean():.5f},{df[WINDS[2]].mean():.5f}'
 
@@ -470,6 +487,7 @@ def _analyze_file(args):
         logger.log('Aligned data: Ux oriented in direction of mean wind')
         if df_slow is not None:
             df_slow = align_to_direction(df_slow, dir_to_align) # also align the slow data to the same direction, if it exists
+            logger.log('Aligned slow data to match orientation of sonic data')
 
     if savecopy: # if enabled, save a copy of the aligned filtered data we used
         if align:
@@ -488,7 +506,6 @@ def _analyze_file(args):
             fpath = os.path.abspath(os.path.join(intermediate,fname))
             df_slow.to_csv(fpath)
             logger.log(f'Copied matching slow data to {fpath}')
-
 
     if plotdata:
         if align:
@@ -510,6 +527,10 @@ def _analyze_file(args):
         summaryinfo += f',{mean_ri:.5f},{median_ri:.5f}'
         ri_string = f'Bulk Ri: mean {mean_ri:.4f}, median {median_ri:.4f} ({stability})'
         logger.log(ri_string)
+        mean_lapse, median_lapse = match_lapse(df, df_match)
+        summaryinfo += f',{mean_lapse:.5f},{median_lapse:.5f}'
+        lapse_string = f'Envt VPT lapse rate: mean {mean_lapse:.4f}, median {median_lapse:.4f}'
+        logger.log(lapse_string)
 
     df_autocorr = compute_autocorrs(df, autocols = autocols, maxlag = maxlag, logger = logger)
 
@@ -596,7 +617,7 @@ def analyze_directory(parent,
         with open(summaryfile, 'w') as f:
             f.write('start,end,mean_u,mean_v,mean_w')
             if matchfile is not None:
-                f.write(',alpha_mean,alpha_median,Rib_mean,Rib_median')
+                f.write(',alpha_mean,alpha_median,Rib_mean,Rib_median,lapse_mean,lapse_median')
             if saveflux:
                 f.write(',Rif,L,ustar')
             if savescales:

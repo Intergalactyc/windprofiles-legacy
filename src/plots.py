@@ -2,10 +2,12 @@
 
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
 from matplotlib import cm
 import seaborn as sns
 import numpy as np
 import helper_functions as hf
+import os
 
 df10 = pd.read_csv('../outputs/slow/ten_minutes_labeled.csv') # 10-minute averaged data, with calculations and labeling performed by reduce.py
 df10['time'] = pd.to_datetime(df10['time'])
@@ -161,6 +163,34 @@ def hist_alpha_by_stability(combine = False, title = True):
     plt.show()
     return
 
+PLOTNAMES = {
+    "autocorr" : ("autocorrs.png", "aligned_autocorrs.png"),
+    "data" : ("data.png", "aligned_data.png"),
+    "fluxes" : ("fluxes.png", "fluxes.png")
+}
+
+SONIC_DIRECTORY = "../outputs/sonic_sample"
+
+def display_sonic_plots(plotname, aligned = True):
+
+    if plotname in PLOTNAMES.keys():
+        plotname = PLOTNAMES[plotname][int(aligned)]
+
+    subdirs = []
+    for entry in os.listdir(SONIC_DIRECTORY):
+        fullpath = os.path.join(SONIC_DIRECTORY,entry)
+        if os.path.isdir(fullpath):
+            subdirs.append(fullpath)
+    
+    for sub in subdirs:
+        imagepath = os.path.join(sub, plotname)
+        try:
+            img = mpimg.imread(imagepath)
+            plt.imshow(img)
+            plt.show()
+        except:
+            print(f"Failed to find/display image from file {imagepath}")
+
 if __name__ == '__main__':
     #stratified_speeds()
     #plot_alpha()
@@ -170,4 +200,7 @@ if __name__ == '__main__':
     #bar_directions()
     #bar_stability()
     #hist_ri()
-    hist_alpha_by_stability(combine = True, title = False)
+    #hist_alpha_by_stability(combine = True, title = False)
+    #display_sonic_plots("data")
+    display_sonic_plots("autocorr")
+    #display_sonic_plots("fluxes")

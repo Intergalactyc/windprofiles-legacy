@@ -85,7 +85,7 @@ def polar_average(magnitudes, directions):
     yavg = np.mean(ys)
     return polar_wind(xavg, yavg)
 
-def top_cond_avg(s1,s2,d1,d2,width=40):
+def top_cond_avg(s1,s2,d1,d2,width=30):
     # Given speeds and uncorrected directions for booms 6 and 7 (6 in s1,d1, 7 in s2,d2),
     # finds the best choice of wind speed/direction at 106m:
     # if wind is coming from the east, boom 6 (which is on the west side) is shadowed and so use boom 7,
