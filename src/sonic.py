@@ -439,6 +439,26 @@ def save_flux(derived, filename, bulk_ri = None, alpha = None):
     
     return
 
+def compute_rms(df, meanwind = "Ux"): # compute std of mean wind, which is RMS of its turbulent part, and return it alongside estimated TI (std/|mean|)
+
+    mean = np.mean(df[meanwind])
+    flux = df[meanwind] - mean
+    squared = flux * flux
+    rms = np.mean(squared) ** 0.5
+
+    return rms, rms/np.abs(mean)
+
+def compute_tke(df, winds = WINDS): # compute TKE using sonic data. Result is in m^2/s^2 = J/kg (assuming initial winds in m/s)
+
+    total = 0
+    for wind in winds:
+        mean = np.mean(df[wind])
+        flux = df[wind] - mean
+        squared = flux * flux
+        total += np.mean(squared)
+
+    return total/2
+
 def append_summary(info, filename):
 
     with open(filename, 'a') as f:
@@ -532,6 +552,21 @@ def _analyze_file(args):
         lapse_string = f'Envt VPT lapse rate: mean {mean_lapse:.4f}, median {median_lapse:.4f}'
         logger.log(lapse_string)
 
+    rms, ti = compute_rms(df)
+    if df_slow is not None:
+        rms_slow, ti_slow = compute_rms(df_slow)
+        summaryinfo += f',{rms:.5f},{rms_slow:.5f},{ti:.5f},{ti_slow:.5f}'
+        logger.log(f'RMS: {rms:.4f} m/s (slow {rms_slow:.4f} m/s)')
+        logger.log(f'TI: {ti:.4f} (slow {ti_slow:.4f})')
+    else:
+        summaryinfo += f',{rms:.5f},{ti:.5f}'
+        logger.log(f'RMS: {rms:.4f} m/s')
+        logger.log(f'TI: {ti:.4f}')
+
+    tke = compute_tke(df)
+    summaryinfo += f',{tke:.5f}'
+    logger.log(f'Computed TKE: {tke:.4f} J/kg')
+
     df_autocorr = compute_autocorrs(df, autocols = autocols, maxlag = maxlag, logger = logger)
 
     if saveautocorrs:
@@ -618,6 +653,10 @@ def analyze_directory(parent,
             f.write('start,end,mean_u,mean_v,mean_w')
             if matchfile is not None:
                 f.write(',alpha_mean,alpha_median,Rib_mean,Rib_median,lapse_mean,lapse_median')
+            if slowfile is not None:
+                f.write(',rms,slow_rms,ti,slow_ti,tke')
+            else:
+                f.write(',rms,ti,tke')
             if saveflux:
                 f.write(',Rif,L,ustar')
             if savescales:
