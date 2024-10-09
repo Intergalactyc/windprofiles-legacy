@@ -4,7 +4,7 @@
 # Analysis of the snippet of sonic data #
 
 # Example usage:
-#   python sonic.py -c -n 8 --data="../../data/KCC_FluxData_106m_SAMPLE/" --target="../outputs/sonic_sample/" --match="../outputs/slow/ten_minutes_labeled.csv" --slow="../outputs/slow/combined.csv"
+#   python sonic.py -c -k -i -n 8 --data="../../data/KCC_FluxData_106m_SAMPLE/" --target="../outputs/sonic_sample/" --match="../outputs/slow/ten_minutes_labeled.csv" --slow="../outputs/slow/combined.csv"
 #   This uses n=8 processors, clears target directory, and conducts a match with given slow data summary. Alignment by default.
 
 # Note that summary file U, V, W means are pre-alignment, while those logged are post-alignment
@@ -459,6 +459,27 @@ def compute_tke(df, winds = WINDS): # compute TKE using sonic data. Result is in
 
     return total/2
 
+def covariance(df, cols = ['Ux', 'Uz']): # compute covariance
+    sumxz = np.sum(df[cols[0]]*df[cols[1]])
+    sumx = np.sum(df[cols[0]])
+    sumz = np.sum(df[cols[1]])
+    result = (sumxz - (sumx * sumz)/len(df))/(len(df) - 1)
+    return result
+
+def compute_instationarity(df, subintervals = 6): # compute relative instationarity according to Foken & Wichura (1996)
+    # covariance of Ux and Uz (u and w) winds computed as average of that among subintervals
+    covs = []
+    #subdfs = [df]
+    subdfs = np.array_split(df, subintervals)
+    for subdf in subdfs:
+        covs.append(covariance(subdf))
+    meancov = np.mean(covs)
+    # same covariance computed across full interval
+    fullcov = covariance(df)
+    # compute instationarity as relative difference between the two
+    instationarity = np.abs((meancov-fullcov)/fullcov)
+    return instationarity
+
 def append_summary(info, filename):
 
     with open(filename, 'a') as f:
@@ -467,7 +488,7 @@ def append_summary(info, filename):
     return
 
 def _analyze_file(args):
-    filename, parent, kelvinconvert, autocols, maxlag, threshold, savedir, df_match, df_slow, align, savecopy, plotdata, plotautocorrs, saveautocorrs, savescales, plotflux, saveflux, summaryfile, logparent, multiproc = args
+    filename, parent, kelvinconvert, autocols, maxlag, threshold, savedir, df_match, df_slow, align, savecopy, plotdata, plotautocorrs, saveautocorrs, savescales, plotflux, saveflux, direction, instation, summaryfile, logparent, multiproc = args
 
     if multiproc:
         logger = logparent.sublogger()
@@ -495,7 +516,7 @@ def _analyze_file(args):
         df_slow['time'] = pd.to_datetime(df_slow['time'])
         df_slow = df_slow[df_slow['time'].between(starttime, endtime)]
         df_slow.set_index('time', inplace = True)
-        df_slow[['Ux','Uy']] = df_slow.apply(lambda row: hf.wind_components(row['ws_106m'], row['wd_106m'], invert=True), axis=1, result_type='expand') # convert to east and north components
+        df_slow[['Ux', 'Uy']] = df_slow.apply(lambda row: hf.wind_components(row['ws_106m'], row['wd_106m'], invert=True), axis=1, result_type='expand') # convert to east and north components
         df_slow.drop(columns = ['ws_106m','wd_106m'], inplace=True)
         logger.log('Matched corresponding slow data at 106m')
 
@@ -503,6 +524,7 @@ def _analyze_file(args):
 
     if align:
         dir_to_align = mean_direction(df) # determine direction of mean wind
+        delta_dir = np.rad2deg(dir_to_align - mean_direction(df_slow))
         df = align_to_direction(df, dir_to_align) # align data to direction of mean wind
         logger.log('Aligned data: Ux oriented in direction of mean wind')
         if df_slow is not None:
@@ -616,6 +638,13 @@ def _analyze_file(args):
         summaryinfo += f',{length_scale:.5f}'
         logger.log(f'Saved info to {fpath}')
 
+    if direction:
+        summaryinfo += f',{delta_dir:.5f}'
+
+    if instation:
+        instationarity = compute_instationarity(df)
+        summaryinfo += f',{instationarity:.5f}'
+
     for var, s in scales.items():
         logger.log(f'Mean {var} = {df[var].mean():.3f} m/s')
         i_time, i_length = s
@@ -641,6 +670,8 @@ def analyze_directory(parent,
                       saveautocorrs = True,
                       savescales = True,
                       saveflux = True,
+                      direction = True,
+                      instation = True,
                       summaryfile = None,
                       logger = Printer(),
                       nproc = 1
@@ -661,6 +692,10 @@ def analyze_directory(parent,
                 f.write(',Rif,L,ustar')
             if savescales:
                 f.write(',length_scale')
+            if direction:
+                f.write(',delta_dir')
+            if instation:
+                f.write(',instationarity')
             f.write('\n')
         logger.log(f'Saving summary header information to {summaryfile}')
 
@@ -684,7 +719,7 @@ def analyze_directory(parent,
     else:
         df_slow = None
 
-    arguments = (parent, kelvinconvert, autocols, maxlag, threshold, savedir, df_match, df_slow, align, savecopy, plotdata, plotautocorrs, saveautocorrs, savescales, plotflux, saveflux, summaryfile, logger, multiproc)
+    arguments = (parent, kelvinconvert, autocols, maxlag, threshold, savedir, df_match, df_slow, align, savecopy, plotdata, plotautocorrs, saveautocorrs, savescales, plotflux, saveflux, direction, instation, summaryfile, logger, multiproc)
     directory = [(filename, *arguments) for filename in os.listdir(parent)]
 
     pool = multiprocessing.Pool(processes = nproc)
@@ -726,6 +761,8 @@ if __name__ == '__main__':
     parser.add_argument('--noalign', action = 'store_true', help = 'do not geometrically align Ux in the direction of the mean horizontal wind?')
     parser.add_argument('-n', '--nproc', default = 1, help = 'number of CPUs to run; sets verbose to False')
     parser.add_argument('-q', '--silent', action = 'store_true', help = 'neither print nor log?')
+    parser.add_argument('-k', '--direction', action = 'store_true', help = 'measure difference in direction?')
+    parser.add_argument('-i', '--instationary', action = 'store_true', help = 'measure instationarity of data?')
     group = parser.add_mutually_exclusive_group()
     group.add_argument('-v', '--verbose', action = 'store_true', help = 'print to standard output instead of logging?')
     group.add_argument('-l', '--logfile', help = 'file to log to')
@@ -740,6 +777,8 @@ if __name__ == '__main__':
     savedir = args.target
     matchfile = args.match
     slowfile = args.slow
+    direction = args.direction and args.match
+    instation = args.instationary
 
     if '/' not in savedir:
         savedir = f'./{savedir}'
@@ -807,6 +846,8 @@ if __name__ == '__main__':
                       savedir = savedir,
                       plotflux = flux,
                       saveflux = flux,
+                      direction = direction,
+                      instation = instation,
                       summaryfile = os.path.join(savedir, 'summary.csv'),
                       logger = logger,
                       nproc = int(args.nproc)

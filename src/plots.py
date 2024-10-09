@@ -201,6 +201,6 @@ if __name__ == '__main__':
     #bar_stability()
     #hist_ri()
     #hist_alpha_by_stability(combine = True, title = False)
-    #display_sonic_plots("data")
-    display_sonic_plots("autocorr")
+    display_sonic_plots("data")
+    #display_sonic_plots("autocorr")
     #display_sonic_plots("fluxes")
