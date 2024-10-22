@@ -4,10 +4,11 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 from matplotlib import cm
-import seaborn as sns
 import numpy as np
 import helper_functions as hf
 import os
+
+# note to self - the 4:30 ones are "Night", the 18:30 ones are "Noon"
 
 df10 = pd.read_csv('../outputs/slow/ten_minutes_labeled.csv') # 10-minute averaged data, with calculations and labeling performed by reduce.py
 df10['time'] = pd.to_datetime(df10['time'])
@@ -145,8 +146,11 @@ def stratified_speeds():
     plt.show()
     return
 
-def hist_ri():
-    plt.hist(df10[np.abs(df10['ri'])<10]['ri'],bins=100)
+def hist_ri(cutoff = 10, bins = 100):
+    plt.title('Histogram of Bulk Ri Distribution')
+    plt.hist(df10[np.abs(df10['ri'])<cutoff]['ri'],bins=bins, density=True)
+    plt.xlabel('Ri_b')
+    plt.ylabel('probability density')
     plt.show()
     return()
 
@@ -191,6 +195,82 @@ def display_sonic_plots(plotname, aligned = True):
         except:
             print(f"Failed to find/display image from file {imagepath}")
 
+def consider_stratification(cutoffs = [-0.1,0.1], labels = ['unstable','neutral','stable']):
+    N = len(labels)
+    if N != len(cutoffs) + 1:
+        print('Mismatched label/cutoff list lengths')
+        return
+    
+    print(f'Scheme: {cutoffs}')
+
+    total = len(df10)
+    for i in range(N):
+        datahere = df10.copy()
+        if i < N-1:
+            datahere = datahere[datahere['ri'] < cutoffs[i]]
+        if i > 0:
+            datahere = datahere[datahere['ri'] >= cutoffs[i-1]]
+        amount = len(datahere)
+        print(f'{labels[i]}: {amount} ({(100 * amount/total):.1f}%)')
+
+def stats_ri(restriction = [5.]):
+    print('OVERALL BULK RICHARDSON NUMBER STATISTICS')
+    print(f'Median Ri: {np.median(df10.ri):.3f}')
+    print(f'Mean Ri: {np.mean(df10.ri):.3f}')
+    print(f'Std Ri: {np.std(df10.ri):.3f}')
+    for r in restriction:
+        dfR = df10[abs(df10.ri) < r]
+        print(f'RESTRICTED (|Ri| < {r}) BULK RICHARDSON NUMBER STATISTICS')
+        print(f'Restricted dataset contains {(100*len(dfR)/len(df10)):.1f}% of original data')
+        print(f'Median Ri: {np.median(dfR.ri):.3f}')
+        print(f'Mean Ri: {np.mean(dfR.ri):.3f}')
+        print(f'Std Ri: {np.std(dfR.ri):.3f}')
+
+def total_data_available():
+    N = len(heights)
+    availableData = df10.apply(lambda row : N-np.sum([int(pd.isna(row[f'ws_{height}m'])) for height in heights]), axis = 1)
+    plt.scatter(df10['time'], availableData)
+    plt.show()
+    return
+
+def boom_data_available():
+    alltimes = pd.date_range(df10['time'].min(), df10['time'].max(), freq='10min').to_series()
+    for i, height in enumerate(heights):
+        availableData = df10.apply(lambda row : height * int(not pd.isna(row[f'ws_{height}m'])), axis = 1)
+        unavailableData = availableData.apply(lambda row : height - row)
+        availableData[availableData == 0] = np.nan
+        unavailableData[unavailableData == 0] = np.nan
+        if i == 0:
+            plt.scatter(df10['time'], availableData, s=4, c='blue', label = 'available')
+            plt.scatter(df10['time'], unavailableData, s=4, c='red', label = 'unavailable')
+        else:
+            plt.scatter(df10['time'], availableData, s=4, c='blue')
+            plt.scatter(df10['time'], unavailableData, s=4, c='red')
+    fullgaps = alltimes.apply(lambda row : int(row not in np.array(df10['time']).astype('datetime64[ns]')))
+    fullgaps[fullgaps == 0] = np.nan
+    #print(fullgaps[fullgaps == 1])
+    plt.scatter(alltimes, fullgaps, s=4, c='green', label = 'nowhere available')
+    plt.title('Data availability/gaps')
+    plt.xlabel('Time')
+    plt.ylabel('Boom height (m)')
+    plt.legend()
+    plt.show()
+    return
+
+def plot_speeds():
+    for height in heights:
+        plt.scatter(df10['time'],df10[f'ws_{height}m'], label = str(height), s=1)
+    plt.legend()
+    plt.show()
+    return
+
+def stratandri():
+    consider_stratification()
+    consider_stratification(cutoffs=[-0.02,0.02])
+    consider_stratification(cutoffs=[-0.17,0.02])
+    consider_stratification(cutoffs=[-1,1])
+    stats_ri([1,2,5,10])
+
 if __name__ == '__main__':
     #stratified_speeds()
     #plot_alpha()
@@ -199,8 +279,12 @@ if __name__ == '__main__':
     #scatter3()
     #bar_directions()
     #bar_stability()
-    #hist_ri()
+    #stratandri()
+    #hist_ri(cutoff=0.25,bins=50)
     #hist_alpha_by_stability(combine = True, title = False)
-    display_sonic_plots("data")
+    #display_sonic_plots("data")
     #display_sonic_plots("autocorr")
     #display_sonic_plots("fluxes")
+    #plot_speeds()
+    #total_data_available()
+    boom_data_available()

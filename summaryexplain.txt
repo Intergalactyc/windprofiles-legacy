@@ -1,0 +1,18 @@
+start,end                   starting and ending timestamps [YYYY-MM-DD hh:mm:ss]
+mean_u,mean_v,mean_w        pre-alignment mean sonic wind speeds in u, v, w directions [m/s]
+alpha_mean,alpha_median     mean/median alpha values from matched slow data
+Rib_mean,Rib_median         mean/median bulk Ri values from matched slow data
+lapse_mean,lapse_median     mean/median environmental lapse rate (delta vpt / delta z) values from matched slow data [K/m, "]
+rms,slow_rms                root mean square of horizontal wind speed, computed for both sonic and slow data [m/s, "]
+ti,slow_ti                  turbulence intensity of horizontal wind, computed for both sonic and slow data
+tke                         turbulence kinetic energy [J/kg]
+Rif                         flux Richardson number
+wu,wv,wt                    means of w'u', w'v', w'(theta_v)' respectively, i.e. the mean eddy momentum and heat fluxes [m^2/s^2 = J/kg, ", K m/s]
+L                           Obukhov length [m]
+zeta                        stability parameter z/L
+ustar                       friction velocity [m/s]
+length_scale                autocorrelation-computed turbulent length scale [m]
+delta_dir                   mismatch in mean direction between sonic and slow data [degrees]
+instationarity              decimal fraction measure of instationarity according to steady state test
+itc_dev                     decimal fraction measure of integral turbulence characteristic deviation
+sflag                       Spoleto agreement flag, 0 = good, 1 = moderate, 2 = low quality

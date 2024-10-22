@@ -198,6 +198,10 @@ def power_fit(xvals, yvals, both=False):
 def seconds(deltatime):
     return deltatime.days * 24 * 3600 + deltatime.seconds + deltatime.microseconds/1e6
 
+def coriolis(deglat, Omega = 7.2921e-5): # returns coriolis parameter in rad/s at a given latitude in degrees
+    radlat = np.deg2rad(deglat)
+    return 2 * Omega * np.sin(radlat)
+
 def mytest(u0=1.,v0=1.):
     print(f'u = {u0:.3f}, v = {v0:.3f}')
     speed, direction = polar_wind(u0,v0)
