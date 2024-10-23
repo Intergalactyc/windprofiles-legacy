@@ -63,7 +63,7 @@ class Frame:
         plt.show()
         return
     
-    def ccompare(self, first, second, flag = 'sflag', max = 0, zeroax = False, fit = False, id = False, title = None):
+    def ccompare(self, first, second, flag = 'sflag', max = 0, zeroax = False, fit = False, id = False, title = None): # "cut-compare"/"conditional-compare", for visualizing all data but with good/bad quality data colored differently 
         ins = self.df[self.df[flag] <= max]
         outs = self.df[self.df[flag] > max]
         if first in UNITS.keys():

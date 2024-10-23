@@ -522,7 +522,7 @@ def append_summary(info, filename):
     return
 
 def _analyze_file(args):
-    filename, parent, kelvinconvert, autocols, maxlag, threshold, savedir, df_match, df_slow, align, savecopy, plotdata, plotautocorrs, saveautocorrs, savescales, plotflux, saveflux, direction, qc, height, latitude, summaryfile, logparent, multiproc = args
+    filename, parent, kelvinconvert, autocols, maxlag, threshold, savedir, df_match, df_slow, align, savecopy, plotdata, plotautocorrs, saveautocorrs, savescales, plotflux, saveflux, direction, qc, height, latitude, summaryfile, logparent, multiproc, identifier = args
 
     if multiproc:
         logger = logparent.sublogger()
@@ -532,7 +532,7 @@ def _analyze_file(args):
     path = os.path.abspath(os.path.join(parent, filename))
     if not(os.path.isfile(path) and filename[-4:] == '.csv'):
         return
-    logger.log(f'Loading {path}', timestamp = True)
+    logger.log(f'Loading {path} (id {identifier})', timestamp = True)
 
     name = filename[:-4]
     intermediate = f'{savedir}/{name}'
@@ -571,27 +571,27 @@ def _analyze_file(args):
 
     if savecopy: # if enabled, save a copy of the aligned filtered data we used
         if align:
-            fname = 'aligned_data.csv'
+            fname = f'aligned_data_{identifier}.csv'
         else:
-            fname = 'data.csv'
+            fname = f'data_{identifier}.csv'
         fpath = os.path.abspath(os.path.join(intermediate,fname))
         df.to_csv(fpath)
         logger.log(f'Copied data to {fpath}')
 
         if df_slow is not None: # also save a copy of the aligned filtered slow data, if it exists
             if align:
-                fname = 'aligned_slowdata.csv'
+                fname = f'aligned_slowdata_{identifier}.csv'
             else:
-                fname = 'slowdata.csv'
+                fname = f'slowdata_{identifier}.csv'
             fpath = os.path.abspath(os.path.join(intermediate,fname))
             df_slow.to_csv(fpath)
             logger.log(f'Copied matching slow data to {fpath}')
 
     if plotdata:
         if align:
-            fname = 'aligned_data.png'
+            fname = f'aligned_data_{identifier}.png'
         else:
-            fname = 'data.png'
+            fname = f'data_{identifier}.png'
         fpath = os.path.abspath(os.path.join(intermediate, fname))
         plot_data(df, title = f'{name} Data', saveto = fpath, cols = WINDS, df_slow = df_slow)
         logger.log(f'Saved wind plots to {fpath}')
@@ -631,18 +631,18 @@ def _analyze_file(args):
 
     if saveautocorrs:
         if align:
-            fname = 'aligned_autocorrs.csv'
+            fname = f'aligned_autocorrs_{identifier}.csv'
         else:
-            fname = 'autocorrs.csv'
+            fname = f'autocorrs_{identifier}.csv'
         fpath = os.path.abspath(os.path.join(intermediate,fname))
         df_autocorr.to_csv(fpath)
         logger.log(f'Saved autocorrelations to {fpath}')
 
     if plotautocorrs:
         if align:
-            fname = 'aligned_autocorrs.png'
+            fname = f'aligned_autocorrs_{identifier}.png'
         else:
-            fname = 'autocorrs.png'
+            fname = f'autocorrs_{identifier}.png'
         fpath = os.path.abspath(os.path.join(intermediate,fname))
         plot_autocorrs(df_autocorr, title = f'{name} Autocorrelations', saveto = fpath, threshold=threshold)
         logger.log(f'Saved autocorrelation plots to {fpath}')
@@ -652,13 +652,13 @@ def _analyze_file(args):
         logger.log(f'Computed flux information; flux Ri = {derived["Flux Ri"]}')
 
     if plotflux:
-        fname = 'fluxes.png'
+        fname = f'fluxes_{identifier}.png'
         fpath = os.path.abspath(os.path.join(intermediate, fname))
         plot_flux(fluxes, title = f'{name} Fluxes', saveto = fpath)
         logger.log(f'Saved flux plots to {fpath}')
 
     if saveflux:
-        fname = 'flux_calculations.txt'
+        fname = f'flux_calculations_{identifier}.txt'
         fpath = os.path.abspath(os.path.join(intermediate, fname))
         save_flux(derived, filename = fpath, bulk_ri = ri_string, alpha = alpha_string)
         summaryinfo += f',{derived["Flux Ri"]:.5f},{derived["Mean eddy u momentum flux"]:.5f},{derived["Mean eddy v momentum flux"]:.5f},{derived["Mean eddy heat flux"]:.5f},{derived["Obukhov length"]:.5f},{(height/derived["Obukhov length"]):.5f},{derived["Friction velocity"]:.5f},{derived["Vertical wind gradient"]:.5f}'
@@ -666,9 +666,9 @@ def _analyze_file(args):
 
     if savescales:
         if align:
-            fname = 'aligned_integralscales.txt'
+            fname = f'aligned_integralscales_{identifier}.txt'
         else:
-            fname = 'integralscales.txt'
+            fname = f'integralscales_{identifier}.txt'
         scales, warn = integral_scales(df, df_autocorr, cols = list(set(WINDS)&set(autocols)), threshold = threshold, logger = logger)
         fpath = os.path.abspath(os.path.join(intermediate,fname))
         save_scales(scales, filename = fpath, warn = warn, bulk_ri = ri_string, times = time_string, align = align)
@@ -769,7 +769,7 @@ def analyze_directory(parent,
         df_slow = None
 
     arguments = (parent, kelvinconvert, autocols, maxlag, threshold, savedir, df_match, df_slow, align, savecopy, plotdata, plotautocorrs, saveautocorrs, savescales, plotflux, saveflux, direction, qc, height, latitude, summaryfile, logger, multiproc)
-    directory = [(filename, *arguments) for filename in os.listdir(parent)]
+    directory = [(filename, *arguments, i) for i, filename in enumerate(os.listdir(parent))]
 
     pool = multiprocessing.Pool(processes = nproc)
     
