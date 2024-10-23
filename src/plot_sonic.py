@@ -7,6 +7,8 @@ UNITS = {
     'mean_u' : 'm/s',
     'mean_v' : 'm/s',
     'mean_w' : 'm/s',
+    'slow_mean_u' : 'm/s',
+    'slow_mean_v' : 'm/s',
     'lapse_mean' : 'K/m',
     'lapse_median' : 'K/m',
     'rms' : 'm/s',
@@ -61,7 +63,7 @@ class Frame:
         plt.show()
         return
     
-    def ccompare(self, first, second, flag = 'sflag', max = 0, zeroax = False):
+    def ccompare(self, first, second, flag = 'sflag', max = 0, zeroax = False, fit = False, id = False, title = None):
         ins = self.df[self.df[flag] <= max]
         outs = self.df[self.df[flag] > max]
         if first in UNITS.keys():
@@ -75,6 +77,19 @@ class Frame:
         plt.grid(which='both')
         plt.scatter(ins[first], ins[second], c='b', label='High quality')
         plt.scatter(outs[first], outs[second], c='r', label='Low quality')
+        if fit or id:
+            linex = [np.min(self.df[first]), np.max(self.df[first])]
+        if fit:
+            A_all, B_all = hf.ls_linear_fit(self.df[first], self.df[second])
+            liney_all = [A_all + B_all*x for x in linex]
+            plt.plot(linex, liney_all, label=f'All: {A_all:.3f} + {B_all:.3f} * x', c='green', linestyle='dashed')
+            A_ins, B_ins = hf.ls_linear_fit(ins[first], ins[second])
+            liney_ins = [A_ins + B_ins*x for x in linex]
+            plt.plot(linex, liney_ins, label=f'Good: {A_ins:.3f} + {B_ins:.3f} * x', c='blue', linestyle='dashed')
+        if id:
+            plt.plot(linex, linex, label='Identity', c='purple', linestyle='dashed')
+        if title is not None and type(title) is str:
+            plt.title(title)
         plt.legend()
         plt.show()
         return
@@ -125,7 +140,11 @@ if __name__ == '__main__':
     df = Frame('../outputs/sonic_sample/summary.csv')
     #df.compare('Rif','wu')
     #df.ccompare('Rif','wu')
-    df.ccompare('Rif','Rib_median')
+    df.ccompare('mean_u','slow_mean_u',id=True,title='U wind speeds with identity for comparison')
+    df.ccompare('mean_v','slow_mean_v',id=True,title='V wind speeds with identity for comparison')
+    df.ccompare('mean_u','slow_mean_u',fit=True,title='U wind speeds with best fit')
+    df.ccompare('mean_v','slow_mean_v',fit=True,title='V wind speeds with best fit')
+    #df.ccompare('Rif','Rib_median')
     #compareLtoRi(df)
     #df.compare('instationarity','itc_dev',fit=True)
     #compareLtoRi(df)
