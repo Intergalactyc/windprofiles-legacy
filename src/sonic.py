@@ -726,7 +726,7 @@ def analyze_directory(parent,
 
     logger.log(f'Beginning analysis of {parent}', timestamp = True)
 
-    if (summaryfile is not None) and saveflux and (matchfile is not None):
+    if (summaryfile is not None):
         with open(summaryfile, 'w') as f:
             f.write('start,end,mean_u,mean_v,mean_w')
             if slowfile is not None:
