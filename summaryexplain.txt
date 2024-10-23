@@ -1,5 +1,6 @@
 start,end                   starting and ending timestamps [YYYY-MM-DD hh:mm:ss]
 mean_u,mean_v,mean_w        pre-alignment mean sonic wind speeds in u, v, w directions [m/s]
+slow_mean_u,slow_mean_v     pre-alignment mean slow-data wind speeds in u, v directions [m/s]
 alpha_mean,alpha_median     mean/median alpha values from matched slow data
 Rib_mean,Rib_median         mean/median bulk Ri values from matched slow data
 lapse_mean,lapse_median     mean/median environmental lapse rate (delta vpt / delta z) values from matched slow data [K/m, "]
@@ -11,6 +12,7 @@ wu,wv,wt                    means of w'u', w'v', w'(theta_v)' respectively, i.e.
 L                           Obukhov length [m]
 zeta                        stability parameter z/L
 ustar                       friction velocity [m/s]
+ugrad                       vertical wind gradient (partial u / partial z) estimated according to Businger-Dyer [(m/s)/m = Hz]
 length_scale                autocorrelation-computed turbulent length scale [m]
 delta_dir                   mismatch in mean direction between sonic and slow data [degrees]
 instationarity              decimal fraction measure of instationarity according to steady state test

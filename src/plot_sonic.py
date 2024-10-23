@@ -61,6 +61,24 @@ class Frame:
         plt.show()
         return
     
+    def ccompare(self, first, second, flag = 'sflag', max = 0, zeroax = False):
+        ins = self.df[self.df[flag] <= max]
+        outs = self.df[self.df[flag] > max]
+        if first in UNITS.keys():
+            plt.xlabel(f'{first} ({UNITS[first]})')
+        else:
+            plt.xlabel(first)
+        if second in UNITS.keys():
+            plt.ylabel(f'{second} ({UNITS[second]})')
+        else:
+            plt.ylabel(second)
+        plt.grid(which='both')
+        plt.scatter(ins[first], ins[second], c='b', label='High quality')
+        plt.scatter(outs[first], outs[second], c='r', label='Low quality')
+        plt.legend()
+        plt.show()
+        return
+    
     def timeplot(self, variable):
         plt.xlabel('datetime')
         if variable in UNITS.keys():
@@ -105,7 +123,11 @@ def compareLtoRi(df):
 
 if __name__ == '__main__':
     df = Frame('../outputs/sonic_sample/summary.csv')
-    df.compare('instationarity','itc_dev',fit=True)
+    #df.compare('Rif','wu')
+    #df.ccompare('Rif','wu')
+    df.ccompare('Rif','Rib_median')
     #compareLtoRi(df)
-    #dfc = df.cut('sflag', upper = 0.5)
+    #df.compare('instationarity','itc_dev',fit=True)
+    #compareLtoRi(df)
+    #dfc = df.cut('sflag', upper = 0)
     #compareLtoRi(dfc)

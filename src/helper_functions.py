@@ -35,8 +35,12 @@ def wind_gradient(u_star, T_bar, Q_0):
     grad = u_star / (k * z) * phi(z / L)
     return grad
 
-def flux_richardson(eddy_momt_flux, mean_T, eddy_heat_flux, u_star, g = LOCAL_GRAVITY):
-    return (g / mean_T) * eddy_heat_flux / (eddy_momt_flux * wind_gradient(u_star, mean_T, eddy_heat_flux))
+def flux_richardson(eddy_momt_flux, mean_T, eddy_heat_flux, u_star, g = LOCAL_GRAVITY, report_gradient = False):
+    windgrad = wind_gradient(u_star, mean_T, eddy_heat_flux)
+    Rif = (g / mean_T) * eddy_heat_flux / (eddy_momt_flux * windgrad)
+    if report_gradient:
+        return Rif, windgrad
+    return Rif
 
 def saturation_vapor_pressure(T):
     # SVP in kPa, using Tetens' approximation

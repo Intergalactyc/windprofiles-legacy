@@ -1,11 +1,13 @@
 ### sonic.py ###
 # Elliott Walker #
-# Last update: 20 October 2024 #
+# Last update: 23 October 2024 #
 # Analysis of the snippet of sonic data #
 
 # Example usage:
 #   python sonic.py --qc -c -k -n 8 --data="../../data/KCC_FluxData_106m_SAMPLE/" --target="../outputs/sonic_sample/" --match="../outputs/slow/ten_minutes_labeled.csv" --slow="../outputs/slow/combined.csv"
 #   This uses n=8 processors, clears target directory, and conducts a match with given slow data summary. Alignment by default.
+# Without alignment:
+#   python sonic.py --noalign -c -n 8 --data="../../data/KCC_FluxData_106m_SAMPLE/" --target="../outputs/sonic_sample_unaligned/" --match="../outputs/slow/ten_minutes_labeled.csv" --slow="../outputs/slow/combined.csv"
 
 # Note that summary file U, V, W means are pre-alignment, while those logged are post-alignment
 
@@ -403,7 +405,7 @@ def compute_fluxes(df, winds = WINDS, temp = TEMPERATURE):
     derived['Mean eddy heat flux'] = mean_eddy_heat_flux
     derived['Friction velocity'] = u_star
     derived['Obukhov length'] = hf.obukhov_length(u_star, mean_T, mean_eddy_heat_flux)
-    derived['Flux Ri'] = hf.flux_richardson(mean_eddy_uMomt_flux, mean_T, mean_eddy_heat_flux, u_star)
+    derived['Flux Ri'], derived['Vertical wind gradient'] = hf.flux_richardson(mean_eddy_uMomt_flux, mean_T, mean_eddy_heat_flux, u_star, report_gradient=True)
     
     return dff, derived
 
@@ -555,12 +557,15 @@ def _analyze_file(args):
 
     summaryinfo = f'{starttime},{endtime},{df[WINDS[0]].mean():.5f},{df[WINDS[1]].mean():.5f},{df[WINDS[2]].mean():.5f}'
 
+    if df_slow is not None:
+        summaryinfo += f',{df_slow["Ux"].mean():.5f},{df_slow["Uy"].mean():.5f}'
+
     if align:
         dir_to_align = mean_direction(df) # determine direction of mean wind
-        delta_dir = np.rad2deg(dir_to_align - mean_direction(df_slow))
         df = align_to_direction(df, dir_to_align) # align data to direction of mean wind
         logger.log('Aligned data: Ux oriented in direction of mean wind')
         if df_slow is not None:
+            delta_dir = np.rad2deg(dir_to_align - mean_direction(df_slow))
             df_slow = align_to_direction(df_slow, dir_to_align) # also align the slow data to the same direction, if it exists
             logger.log('Aligned slow data to match orientation of sonic data')
 
@@ -656,7 +661,7 @@ def _analyze_file(args):
         fname = 'flux_calculations.txt'
         fpath = os.path.abspath(os.path.join(intermediate, fname))
         save_flux(derived, filename = fpath, bulk_ri = ri_string, alpha = alpha_string)
-        summaryinfo += f',{derived["Flux Ri"]:.5f},{derived["Mean eddy u momentum flux"]:.5f},{derived["Mean eddy v momentum flux"]:.5f},{derived["Mean eddy heat flux"]:.5f},{derived["Obukhov length"]:.5f},{(height/derived["Obukhov length"]):.5f},{derived["Friction velocity"]:.5f}'
+        summaryinfo += f',{derived["Flux Ri"]:.5f},{derived["Mean eddy u momentum flux"]:.5f},{derived["Mean eddy v momentum flux"]:.5f},{derived["Mean eddy heat flux"]:.5f},{derived["Obukhov length"]:.5f},{(height/derived["Obukhov length"]):.5f},{derived["Friction velocity"]:.5f},{derived["Vertical wind gradient"]:.5f}'
         logger.log(f'Saved flux information to {fpath}')
 
     if savescales:
@@ -721,9 +726,11 @@ def analyze_directory(parent,
 
     logger.log(f'Beginning analysis of {parent}', timestamp = True)
 
-    if (summaryfile is not None) and align and saveflux  and (matchfile is not None):
+    if (summaryfile is not None) and saveflux and (matchfile is not None):
         with open(summaryfile, 'w') as f:
             f.write('start,end,mean_u,mean_v,mean_w')
+            if slowfile is not None:
+                f.write(',slow_mean_u,slow_mean_v')
             if matchfile is not None:
                 f.write(',alpha_mean,alpha_median,Rib_mean,Rib_median,lapse_mean,lapse_median')
             if slowfile is not None:
@@ -731,7 +738,7 @@ def analyze_directory(parent,
             else:
                 f.write(',rms,ti,tke')
             if saveflux:
-                f.write(',Rif,wu,wv,wt,L,zeta,ustar')
+                f.write(',Rif,wu,wv,wt,L,zeta,ustar,ugrad')
             if savescales:
                 f.write(',length_scale')
             if direction:
@@ -821,7 +828,7 @@ if __name__ == '__main__':
     savedir = args.target
     matchfile = args.match
     slowfile = args.slow
-    direction = args.direction and args.match
+    direction = args.direction and args.match and align
     qc = args.qc
     height = float(args.height)
     latitude = float(args.latitude)
