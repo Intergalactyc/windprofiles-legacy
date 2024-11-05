@@ -14,6 +14,7 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from statsmodels.tsa.stattools import adfuller
 import os
 from tqdm import tqdm
 from datetime import datetime
@@ -34,50 +35,6 @@ IGNORE = ['H2O', 'CO2', 'amb_tmpr', 'amb_press'] # Columns we don't care about
 COLORS = [f'C{i}' for i in range(7)] # Plot color cycle
 CRLATITUDE = 41.91 # Cedar Rapids latitude in degrees
 
-class Logger:
-    def __init__(self, logfile = 'output.log', pid = 0):
-        self.is_printer = False
-        self.is_void = False
-        self.logfile = logfile
-        self.pid = pid        
-    
-    def log(self, string, timestamp = False):
-        log_string = f'[{datetime.now()}] {string}' if timestamp else str(string)
-        pid = self.pid if self.pid else 'LOGPARENT'
-        log_string = f'[[{pid}]] {log_string}'
-        with open(self.logfile, 'a') as f:
-            f.write(log_string+'\n')
-        return
-
-    def sublogger(self, pid = None):
-        if pid is None:
-            pid = os.getpid()
-        self.log(f'Spawned sublogger for pid {pid}', timestamp=True)
-        if self.is_printer:
-            return Printer(pid = pid)
-        if self.is_void:
-            return VoidLogger()
-        return Logger(logfile = self.logfile, pid = pid)
-    
-class VoidLogger(Logger):
-    def __init__(self):
-        Logger.__init__(self)
-        self.is_void = True
-    
-    def log(self, string, timestamp = False):
-        return
-    
-class Printer(Logger):
-    def __init__(self, pid = 0):
-        Logger.__init__(self, pid = pid)
-        self.is_printer = True
-
-    def log(self, string, timestamp = False):
-        log_string = f'[{datetime.now()}] {string}' if timestamp else str(string) 
-        if self.pid: log_string = f'[[{self.pid}]] {log_string}'
-        print(log_string)
-        return
-
 # Loads dataframe: Handles timestamps, duplicate removal, column removal, and conversion.
 def load_frame(filepath, # location of the CSV file to load
                kelvinconvert = TEMPS_C, # columns which should be converted from C -> K
@@ -93,10 +50,10 @@ def load_frame(filepath, # location of the CSV file to load
 
     for col in df.columns:
 
-        if col in ignore: # We don't care about 
+        if col in ignore: # We don't care about these columns
             df.drop(columns = [col], inplace = True)
             continue
-
+        
         df[col] = pd.to_numeric(df[col], errors = 'coerce')
 
         if col in kelvinconvert: # Any column listed in kelvinconvert will have its values converted from C to K
@@ -145,7 +102,7 @@ def compute_autocorrs(df, # Dataframe to work with
     df_autocorr.set_index('lag', inplace = True)
 
     if logger:
-        logger.log(f'Completed autocorrelations', timestamp = True)
+        logger.log(f'Computed autocorrelations', timestamp = True)
 
     return df_autocorr
 
@@ -308,7 +265,6 @@ def match_lapse(df,
 
     return mean_lapse, median_lapse
 
-# Geometrically align the Ux and Uy components of wind such that Ux is oriented in the direction of the mean wind and Uy is in the crosswind direction
 def mean_direction(df, components = WINDS[:2]):
 
     ux = df[components[0]]
@@ -320,6 +276,7 @@ def mean_direction(df, components = WINDS[:2]):
 
     return dir_to_align
 
+# Geometrically align the Ux and Uy components of wind such that Ux is oriented in the direction of the mean wind and Uy is in the crosswind direction
 def align_to_direction(df, dir_to_align, components = WINDS[:2]):
 
     ux = df[components[0]]
@@ -424,7 +381,7 @@ def plot_flux(fluxes, title = 'Flux Plot', saveto = None):
     ax.set_xlabel('Seconds since {startime}')
     ax.legend()
 
-    fig.tight_layout(pad = 1)
+    fig.tight_layout(pad = 1)meine Klassen sind Astronomie, Deutsch, und Topologie.
 
     if saveto is None:
         plt.show()
@@ -449,10 +406,10 @@ def save_flux(derived, filename, bulk_ri = None, alpha = None):
     
     return
 
-def compute_rms(df, meanwind = "Ux"): # compute std of mean wind, which is RMS of its turbulent part, and return it alongside estimated TI (std/|mean|)
+def compute_rms(df, direction = "Ux"): # compute std of mean wind, which is RMS of its turbulent part, and return it alongside estimated TI (std/|mean|)
 
-    mean = np.mean(df[meanwind])
-    flux = df[meanwind] - mean
+    mean = np.mean(df[direction])
+    flux = df[direction] - mean
     squared = flux * flux
     rms = np.mean(squared) ** 0.5
 
@@ -476,10 +433,9 @@ def covariance(df, cols = ['Ux', 'Uz']): # compute covariance
     result = (sumxz - (sumx * sumz)/len(df))/(len(df) - 1)
     return result
 
-def compute_instationarity(df, subintervals = 6): # compute relative instationarity according to Foken & Wichura (1996)
+def covar_instationarity(df, subintervals = 6): # compute relative instationarity according to Foken & Wichura (1996)
     # covariance of Ux and Uz (u and w) winds computed as average of that among subintervals
     covs = []
-    #subdfs = [df]
     subdfs = np.array_split(df, subintervals)
     for subdf in subdfs:
         covs.append(covariance(subdf))
@@ -490,7 +446,7 @@ def compute_instationarity(df, subintervals = 6): # compute relative instationar
     instationarity = np.abs((meancov-fullcov)/fullcov)
     return instationarity
 
-def compute_itc_deviation(df, z, ustar, L, lat, cols = ['Ux', 'Uz']): # compute integral turbulence characteristic deviation based on Tables 6 and 7 of Mauder & Foken (2011)
+def compute_itc_deviation(df, z, ustar, L, lat, cols = [WINDS[0], WINDS[2]]): # compute integral turbulence characteristic deviation based on Tables 6 and 7 of Mauder & Foken (2011)
     f = hf.coriolis(lat)
     zoverL = z/L
     if -0.2 < zoverL < 0.4:
@@ -513,6 +469,43 @@ def spoleto(instation, itcdev): # return Spoleto agreement flag (0, 1, or 2) bas
         return 1 # moderate quality data
     else:
         return 2 # low quality data
+    
+def rms_variation(df, subintervals = 6, which = WINDS): # difference in RMS between min and max observed within subintervals
+    print('rms variation')
+    instations = []
+    subdfs = np.array_split(df, subintervals)
+    for col in which:
+        rmss = []
+        for subdf in subdfs:
+            rmss.append(compute_rms(subdf, direction = col))
+        minrms = np.min(rmss)
+        maxrms = np.max(rmss)
+        variation = np.abs((maxrms-minrms)/minrms)
+        instations.append(variation)
+    return np.max(instations) # larger of the 3 deviations is taken
+
+def adf_test(df, which = WINDS):
+    print('adf test')
+    fails = 0
+    critical_fails = 2 if len(which) > 1 else 1
+    for col in which:
+        try:
+            dftest = adfuller(df[col], autolag="AIC")
+        except Exception as e:
+            print("ADF test exception encountered: ")
+            print(e)
+            continue # default to pass
+        statistic = dftest[0]
+        pval = dftest[1]
+        critical = dftest[4]['5%']
+        print(statistic,pval,critical)
+        if statistic > critical or pval > 0.05:
+            fails += 1
+        if fails >= critical_fails:
+            return 2
+    if fails == 0:
+        return 0
+    return 1
 
 def append_summary(info, filename):
 
@@ -683,19 +676,19 @@ def _analyze_file(args):
         # qc enabled depends on flux enabled so we can use the `derived` dict from above
         ustar = derived['Friction velocity'] 
         L = derived['Obukhov length']
-        instationarity = compute_instationarity(df)
-        summaryinfo += f',{instationarity:.5f}'
+        rms_change = rms_variation(df)
+        covar_instation = covar_instationarity(df)
         itc_deviation = compute_itc_deviation(df, z=height, L=L, ustar=ustar, lat=latitude)
-        summaryinfo += f',{itc_deviation:.5f}'
-        spoletoflag = spoleto(instationarity, itc_deviation)
-        summaryinfo += f',{spoletoflag}'
+        spoleto_flag = spoleto(covar_instation, itc_deviation)
+        adf_flag = adf_test(df)
+        summaryinfo += f',{rms_change:.5f},{covar_instation:.5f},{itc_deviation:.5f},{spoleto_flag},{adf_flag}'
 
     for var, s in scales.items():
         logger.log(f'Mean {var} = {df[var].mean():.3f} m/s')
         i_time, i_length = s
         logger.log(f'\tIntegral time scale = {i_time:.3f} s')
         logger.log(f'\tIntegral length scale = {i_length:.3f} m')
-    
+            
     append_summary(summaryinfo, summaryfile)
     
 def analyze_directory(parent, 
@@ -744,7 +737,7 @@ def analyze_directory(parent,
             if direction:
                 f.write(',delta_dir')
             if qc:
-                f.write(',instationarity,itc_dev,sflag')
+                f.write(',rms_change,ss_dev,itc_dev,sflag,urflag')
             f.write('\n')
         logger.log(f'Saving summary header information to {summaryfile}')
 

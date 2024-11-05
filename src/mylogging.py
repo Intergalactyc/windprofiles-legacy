@@ -1,3 +1,6 @@
+import os
+from datetime import datetime
+
 class Logger:
     def __init__(self, logfile = 'output.log', pid = 0):
         self.is_printer = False

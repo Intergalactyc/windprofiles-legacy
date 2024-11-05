@@ -60,6 +60,20 @@ def virtual_potential_temperature(RH, P, T):
         # and is valid within ~1% for mixing ratios between roughly 0.00-0.20
     return vpT
 
+"""
+def alternate_virtual_potential_temperature(SH, P, T):
+    # given specific humidity in g/m^3, P in kPa, T in K, computes v.p.t.
+    r_air = 287.05 # specific gas constant for dry air in J/(kg*K)
+    mwr = 0.622 # molecular weight ratio of water to air
+    rho_air = P / (r_air * T) # density of air in kg/m^3
+    w = SH / rho_air # mixing ratio
+    P0 = 100. # reference pressure in kPa
+    vT = T * (P0/P)**0.286 # virtual temperature
+    vpT = vT * (1+(w/mwr)/(1+w)) # virtual potential temperature, exact form
+    print(f'{rho_air=},{w=},{vT=},{vpT=}')
+    return vpT
+"""
+
 def wind_components(speed, direction, invert=False):
     # given a wind speed and a direction in degrees CW of N,
     # return u, v (eastward, northward) components of wind
