@@ -4,7 +4,7 @@
 # Analysis of the snippet of sonic data #
 
 # sample usage:
-# python newsonic.py -n 8 --data="../../data/KCC_FluxData_106m_SAMPLE" --output="../outputs/sonic_sample" --match="../outputs/slow/ten_minutes_labeled.csv" --slow="../outputs/slow/combined.csv"
+# python newsonic.py -n 8 --data="../../data/KCC_FluxData_106m_SAMPLE" --output="../../outputs/sonic_sample" --match="../../outputs/slow/ten_minutes_labeled.csv" --slow="../../outputs/slow/combined.csv"
 
 import pandas as pd
 import numpy as np
@@ -777,9 +777,9 @@ if __name__ == '__main__':
     )
 
     parser.add_argument('-d', '--data', default = '../../data/KCC_FluxData_106m_SAMPLE', help = 'input data directory')
-    parser.add_argument('-o', '--output', default = '../outputs/sonic_sample',  help = 'output target directory')
-    parser.add_argument('-m', '--match', default = '../outputs/slow/ten_minutes_labeled.csv', help = 'file containing bulk Ri to match')
-    parser.add_argument('-s', '--slow', default = '../outputs/slow/combined.csv', help = 'file containing slow data to match')
+    parser.add_argument('-o', '--output', default = '../../outputs/sonic_sample',  help = 'output target directory')
+    parser.add_argument('-m', '--match', default = '../../outputs/slow/ten_minutes_labeled.csv', help = 'file containing bulk Ri to match')
+    parser.add_argument('-s', '--slow', default = '../../outputs/slow/combined.csv', help = 'file containing slow data to match')
     parser.add_argument('-n', '--nproc', default = '1', help = 'number of CPUs to use')
     parser.add_argument('-r', '--restart', action = 'store_true', help = 'restart all computations, deleting any existing intermediate computations')
     parser.add_argument('--latitude', default=str(CRLATITUDE), help = 'site latitude, in degrees')

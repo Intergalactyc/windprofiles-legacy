@@ -6,7 +6,7 @@ import numpy as np
 import helper_functions as hf
 
 # Read in dataframe created in combine.py
-df = pd.read_csv('../outputs/slow/combined.csv') # File from combine.py; this has the data overlapping from all booms, except 5 is only where available
+df = pd.read_csv('../../outputs/slow/combined.csv') # File from combine.py; this has the data overlapping from all booms, except 5 is only where available
 df['time'] = pd.to_datetime(df['time'])
 df.set_index('time', inplace=True)
 
@@ -72,5 +72,5 @@ df_10_min_avg['alpha'] = df_10_min_avg.apply(lambda row: hf.power_fit(heights,[r
 print(f'Exporting reduced data. Length: {len(df_10_min_avg)} rows.')
 
 # Save to CSV
-df_10_min_avg.to_csv('../outputs/slow/ten_minutes_labeled.csv')
+df_10_min_avg.to_csv('../../outputs/slow/ten_minutes_labeled.csv')
 

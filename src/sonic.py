@@ -4,10 +4,10 @@
 # Analysis of the snippet of sonic data #
 
 # Example usage:
-#   python sonic.py --qc -c -k -n 8 --data="../../data/KCC_FluxData_106m_SAMPLE/" --target="../outputs/sonic_sample/" --match="../outputs/slow/ten_minutes_labeled.csv" --slow="../outputs/slow/combined.csv"
+#   python sonic.py --qc -c -k -n 8 --data="../../data/KCC_FluxData_106m_SAMPLE/" --target="../../outputs/sonic_sample/" --match="../../outputs/slow/ten_minutes_labeled.csv" --slow="../../outputs/slow/combined.csv"
 #   This uses n=8 processors, clears target directory, and conducts a match with given slow data summary. Alignment by default.
 # Without alignment:
-#   python sonic.py --noalign -c -n 8 --data="../../data/KCC_FluxData_106m_SAMPLE/" --target="../outputs/sonic_sample_unaligned/" --match="../outputs/slow/ten_minutes_labeled.csv" --slow="../outputs/slow/combined.csv"
+#   python sonic.py --noalign -c -n 8 --data="../../data/KCC_FluxData_106m_SAMPLE/" --target="../../outputs/sonic_sample_unaligned/" --match="../../outputs/slow/ten_minutes_labeled.csv" --slow="../../outputs/slow/combined.csv"
 
 # Note that summary file U, V, W means are pre-alignment, while those logged are post-alignment
 
@@ -381,7 +381,7 @@ def plot_flux(fluxes, title = 'Flux Plot', saveto = None):
     ax.set_xlabel('Seconds since {startime}')
     ax.legend()
 
-    fig.tight_layout(pad = 1)meine Klassen sind Astronomie, Deutsch, und Topologie.
+    fig.tight_layout(pad = 1)
 
     if saveto is None:
         plt.show()
@@ -794,9 +794,9 @@ if __name__ == '__main__':
     parser.add_argument('-c', '--clear', action = 'store_true', help = 'clear the target directory?')
     parser.add_argument('-y', '--yes', action = 'store_true', help = 'do not confirm before clearing?')
     parser.add_argument('-d', '--data', default = '../../data/KCC_FluxData_106m_SAMPLE', help = 'input data directory')
-    parser.add_argument('-t', '--target', default = '../outputs/sonic_sample',  help = 'output target directory')
-    parser.add_argument('-m', '--match', default = '../outputs/slow/ten_minutes_lapibeled.csv', help = 'file containing bulk Ri to match')
-    parser.add_argument('-s', '--slow', default = '../outputs/slow/combined.csv', help = 'file containing slow data to match')
+    parser.add_argument('-t', '--target', default = '../../outputs/sonic_sample',  help = 'output target directory')
+    parser.add_argument('-m', '--match', default = '../../outputs/slow/ten_minutes_lapibeled.csv', help = 'file containing bulk Ri to match')
+    parser.add_argument('-s', '--slow', default = '../../outputs/slow/combined.csv', help = 'file containing slow data to match')
     parser.add_argument('--nomatch', action = 'store_true', help = 'do not perform Ri match?')
     parser.add_argument('--noslow', action = 'store_true', help = 'do not plot slow data?')
     parser.add_argument('--noflux', action = 'store_true', help = 'do not perform flux calculations?')

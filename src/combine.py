@@ -98,4 +98,4 @@ for column in df.columns:
 
 print(f'Exporting combined data. Length: {len(df)} rows.')
 
-df.to_csv('../outputs/slow/combined.csv')
+df.to_csv('../../outputs/slow/combined.csv')
