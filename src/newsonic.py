@@ -1,6 +1,6 @@
 ### newsonic.py ###
 # Elliott Walker #
-# Last update: 4 November 2024 #
+# Last update: 14 December 2024 #
 # Analysis of the snippet of sonic data #
 
 # sample usage:
@@ -557,7 +557,7 @@ def _analyze_file(arguments):
         #df.set_index('time', inplace=True)
 
         result = dict()
-
+        
         name = filename[:-4]
         result['filename'] = name
 
@@ -742,6 +742,7 @@ def analyze_directory(parent,
 
     summarypath = os.path.abspath(os.path.join(savedir, 'summary.csv'))
     logger.log(f'Finished analysis. Now saving data to {summarypath}')
+    print(results)
     summary = pd.DataFrame(strip_results(results)).set_index('filename') # convert the resulting list of dicts to a dataframe for easy CSV saving
     summary.to_csv(summarypath, float_format='%.6f') # save summary of results as CSV
 

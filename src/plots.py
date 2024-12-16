@@ -10,7 +10,7 @@ import os
 
 # note to self - the 4:30 ones are "Night", the 18:30 ones are "Noon"
 
-df10 = pd.read_csv('../outputs/slow/ten_minutes_labeled.csv') # 10-minute averaged data, with calculations and labeling performed by reduce.py
+df10 = pd.read_csv('../../outputs/slow/ten_minutes_labeled.csv') # 10-minute averaged data, with calculations and labeling performed by reduce.py
 df10['time'] = pd.to_datetime(df10['time'])
 
 # Useful list of all of the heights, in m, that data exists at
@@ -117,10 +117,27 @@ def alpha_vs_ri(d=False):
     return
 
 def plot_alpha(d=False):
-    plt.scatter(df10['time'],df10['alpha'],s=0.4)
+    plt.title('WSE over time, with comparison to temperature')
+    plt.scatter(df10['time'],df10['alpha'],s=0.4, label = r'$\alpha$')
     if d: plt.plot(df10['time'],[1/7]*len(df10))
-    plt.scatter(df10['time'],df10['t_10m']/50-5, s=0.3)
+    plt.scatter(df10['time'],df10['t_10m']/50-4, s=0.3, label = r'$T/(50\text{ K})-4 \text{ K}$')
     plt.xlabel('time')
+    plt.legend()
+    plt.show()
+    return
+
+def alpha_vs_temperature(month = None):
+    if month is not None:
+        dfm = df10[df10['time'].dt.month == month]
+        month = 'Month ' + str(month)
+        size = 0.5
+    else:
+        dfm = df10 # if no month is specified use full dataset
+        month = 'All Data'
+        size = 0.3
+    plt.title(f'WSE vs Temperature at 10 meters ({month})')
+    plt.scatter(dfm['t_10m'], dfm['alpha'], s=size)
+    plt.xlabel('temperature (10m)')
     plt.ylabel(r'$\alpha$')
     plt.show()
     return
@@ -273,7 +290,6 @@ def stratandri():
 
 if __name__ == '__main__':
     #stratified_speeds()
-    #plot_alpha()
     #alpha_vs_lapse()
     #alpha_vs_ri()
     #scatter3()
@@ -287,4 +303,6 @@ if __name__ == '__main__':
     #display_sonic_plots("fluxes")
     #plot_speeds()
     #total_data_available()
-    boom_data_available()
+    #boom_data_available()
+    #plot_alpha()
+    alpha_vs_timeofday()
