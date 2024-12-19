@@ -98,6 +98,6 @@ def generate_roses(df, directory='../outputs/windroses', transparent=False):
     return
 
 if __name__ == '__main__':
-    df10 = pd.read_csv('../outputs/slow/ten_minutes_labeled.csv') # 10-minute averaged data, with calculations and labeling performed by reduce.py
+    df10 = pd.read_csv('../../outputs/slow/ten_minutes_labeled.csv') # 10-minute averaged data, with calculations and labeling performed by reduce.py
     df10['time'] = pd.to_datetime(df10['time'])
     generate_roses(df10)

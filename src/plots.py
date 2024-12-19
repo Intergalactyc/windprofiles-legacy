@@ -120,7 +120,7 @@ def plot_alpha(d=False):
     plt.title('WSE over time, with comparison to temperature')
     plt.scatter(df10['time'],df10['alpha'],s=0.4, label = r'$\alpha$')
     if d: plt.plot(df10['time'],[1/7]*len(df10))
-    plt.scatter(df10['time'],df10['t_10m']/50-4, s=0.3, label = r'$T/(50\text{ K})-4 \text{ K}$')
+    plt.scatter(df10['time'],df10['t_10m']/50-4, s=0.3, label = r'$T/(50\text{ K})-4$')
     plt.xlabel('time')
     plt.legend()
     plt.show()

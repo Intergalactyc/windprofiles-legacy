@@ -5,6 +5,7 @@ from matplotlib import cm
 import numpy as np
 import helper_functions as hf
 import os
+from sun_position_calculator import SunPositionCalculator
 
 # Load data
 df10 = pd.read_csv('../../outputs/slow/ten_minutes_labeled.csv') # 10-minute averaged data, with calculations and labeling performed by reduce.py
@@ -14,6 +15,10 @@ df10['time'] = pd.to_datetime(df10['time'])
 heights = [6,10,20,32,80,106]
 zvals = np.linspace(0.,130.,400)
 
+# Latitude and longitude
+CRLATITUDE = 41.91 # KCC met tower latitude in degrees
+CRLONGITUDE = -91.65 # Met tower longitude in degree
+
 # Months
 months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 seasons = {'Fall' : ['Sep', 'Oct', 'Nov'],
@@ -21,6 +26,7 @@ seasons = {'Fall' : ['Sep', 'Oct', 'Nov'],
            'Spring' : ['Mar', 'Apr', 'May'],
            'Summer' : ['Jun', 'Jul', 'Aug']
            }
+seasonal_colors = {'Fall' : 'orange', 'Summer' : 'red', 'Spring' : 'green', 'Winter' : 'blue'}
 
 # Terrain classes
 terrain_classes = ['complex', 'open']
@@ -222,14 +228,15 @@ def alpha_vs_timeofday(month = None):
     else: 
         dfm = df10.copy() # if no month is specified use full dataset
         month = 'All Data'
-    dfm.loc['secondsintoday'] = (dfm['time'].dt.hour * 24 + dfm['time'].dt.minute) * 60 + dfm['time'].dt.second 
+    dfm['secondsintoday'] = (dfm['time'].dt.hour * 60 + dfm['time'].dt.minute) * 60 + dfm['time'].dt.second 
     uniquetimes = dfm['secondsintoday'].unique()
     means = [dfm[dfm['secondsintoday'] == time]['alpha'].mean() for time in uniquetimes]
     stds = [dfm[dfm['secondsintoday'] == time]['alpha'].std() for time in uniquetimes]
     plt.title(f'WSE vs Time of Day ({month})')
     plt.errorbar(uniquetimes, means, yerr = stds, fmt = 'o', markersize=3, capsize=3, elinewidth=0.5)
-    plt.xlabel('Time of day')
+    plt.xlabel('Time of day (seconds past midnight UTC)')
     plt.ylabel(r'$\alpha$')
+    plt.tight_layout()
     plt.show()
 
 def alpha_vs_timeofday_with_terrain(month = None, height = 10, errorbars = False):
@@ -239,7 +246,7 @@ def alpha_vs_timeofday_with_terrain(month = None, height = 10, errorbars = False
     else:
         dfm = df10.copy() # if no month is specified use full dataset
         month = 'All Data'
-    dfm['secondsintoday'] = (dfm['time'].dt.hour * 24 + dfm['time'].dt.minute) * 60 + dfm['time'].dt.second 
+    dfm['secondsintoday'] = (dfm['time'].dt.hour * 60 + dfm['time'].dt.minute) * 60 + dfm['time'].dt.second 
     for tc in terrain_classes:
         dft = dfm[dfm[f'wd_{int(height)}m'].apply(hf.terrain_class) == tc]
         uniquetimes = dft['secondsintoday'].unique()
@@ -250,24 +257,73 @@ def alpha_vs_timeofday_with_terrain(month = None, height = 10, errorbars = False
         else:
             plt.scatter(uniquetimes, means, s=4, label = tc.title())
     plt.legend()
-    plt.xlabel('Time of day')
+    plt.xlabel('Time of day (seconds past midnight UTC)')
     plt.ylabel(r'$\alpha$')
-    plt.title(f'WSE vs Time of Day, by Terrain (based on {int(height)}m directions)')
+    plt.title(f'Mean WSE vs Time of Day, by Terrain (based on {int(height)}m directions)')
+    plt.tight_layout()
     plt.show()
 
 def alpha_vs_timeofday_with_seasons():
     for S, mons in seasons.items():
         monnums = [months.index(m)+1 for m in mons]
         dfS = df10[df10['time'].dt.month.isin(monnums)].copy()
-        dfS['secondsintoday'] = (dfS['time'].dt.hour * 24 + dfS['time'].dt.minute) * 60 + dfS['time'].dt.second 
+        dfS['secondsintoday'] = (dfS['time'].dt.hour * 60 + dfS['time'].dt.minute) * 60 + dfS['time'].dt.second 
         uniquetimes = np.sort(dfS['secondsintoday'].unique())
         means = [dfS[dfS['secondsintoday'] == time]['alpha'].mean() for time in uniquetimes]
-        plt.plot(uniquetimes, means, linewidth=1, label = S)
+        plt.plot(uniquetimes, means, linewidth=1, label = S, color = seasonal_colors[S])
     plt.legend()
-    plt.xlabel('Time of day')
+    plt.xlabel('Time of day (seconds past midnight UTC)')
     plt.ylabel(r'$\alpha$')
-    plt.title(f'WSE vs Time of Day, by Season')
+    plt.title(f'Mean WSE vs Time of Day, by Season')
+    plt.tight_layout()
     plt.show()
+
+def temperature_vs_timeofday_with_seasons(height = 10):
+    for S, mons in seasons.items():
+        monnums = [months.index(m)+1 for m in mons]
+        dfS = df10[df10['time'].dt.month.isin(monnums)].copy()
+        dfS['secondsintoday'] = (dfS['time'].dt.hour * 60 + dfS['time'].dt.minute) * 60 + dfS['time'].dt.second 
+        uniquetimes = np.sort(dfS['secondsintoday'].unique())
+        means = [dfS[dfS['secondsintoday'] == time][f't_{int(height)}m'].mean() for time in uniquetimes]
+        plt.plot(uniquetimes, means, linewidth=1, label = S, color = seasonal_colors[S])
+    plt.legend()
+    plt.xlabel('Time of day (seconds past midnight UTC)')
+    plt.ylabel('Temperature (K)')
+    plt.title(f'Mean Temperature ({int(height)}m) vs Time of Day, by Season')
+    plt.tight_layout()
+    plt.show()
+
+def combine_alpha_temperature_seasonality_plots(height = 10):
+    for S, mons in seasons.items():
+        monnums = [months.index(m)+1 for m in mons]
+        dfS = df10#[df10['time'].dt.month.isin(monnums)].copy()
+        dfS['secondsintoday'] = (dfS['time'].dt.hour * 60 + dfS['time'].dt.minute) * 60 + dfS['time'].dt.second 
+        uniquetimes = np.sort(dfS['secondsintoday'].unique())
+        meanalphas = [dfS[dfS['secondsintoday'] == time]['alpha'].mean() for time in uniquetimes]
+        meanTs = [dfS[dfS['secondsintoday'] == time][f't_{int(height)}m'].mean() for time in uniquetimes]
+        normalized_Ts = (meanTs - np.min(meanTs))/(2*(np.max(meanTs) - np.min(meanTs)))
+        plt.plot(uniquetimes, meanalphas, linewidth=1, linestyle = 'solid', label = S + r' $\alpha$', color = seasonal_colors[S])
+        plt.plot(uniquetimes, normalized_Ts, linewidth=1, linestyle = 'dashed', label = S + ' normalized temperature', color = seasonal_colors[S])
+    plt.legend()
+    plt.xlabel('Time of day (seconds past midnight UTC)')
+    plt.title(f'Mean WSE vs Time of Day, by Season, with (normalized) temperature ({int(height)}m)')
+    plt.tight_layout()
+    plt.show()
+
+def alpha_vs_sun_altitude():
+    #sun_altitudes = df10['time'].apply(lambda t : get_position(t, CRLATITUDE, CRLONGITUDE)['altitude'])
+    calculator = SunPositionCalculator()
+    sun_altitudes = np.rad2deg(df10['time'].apply(lambda t : calculator.pos(t.timestamp()*1000, CRLATITUDE, CRLONGITUDE).altitude))
+    # plt.scatter(df10['time'],sun_altitudes)
+    plt.scatter(sun_altitudes, df10['alpha'], s=0.1)
+    plt.ylim(-0.1,1.0)
+    plt.show()
+
+# def delta_alpha_vs_delta_temperature(height = 10):
+#     d_alpha_dt = df10['alpha'].diff() / df10['time'].diff().dt.seconds
+#     d_temp_dt = df10[f't_{int(height)}m'].diff() / df10['time'].diff().dt.seconds
+#     plt.scatter(d_temp_dt, df10['alpha'], s=0.1)
+#     plt.show()
 
 if __name__ == '__main__':
     import plots
@@ -276,5 +332,9 @@ if __name__ == '__main__':
     #     stability_plots(stability = default_stability, height = h)
     #stability_plots(stability = five_stability)
     #alpha_vs_timeofday()
-    alpha_vs_timeofday_with_seasons()
+    #alpha_vs_timeofday_with_seasons()
     #alpha_vs_timeofday_with_terrain(height = 10)
+    #alpha_vs_timeofday_with_terrain(height = 6)
+    # temperature_vs_timeofday_with_seasons()
+    #combine_alpha_temperature_seasonality_plots()
+    #alpha_vs_sun_altitude()
