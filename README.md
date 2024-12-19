@@ -7,6 +7,8 @@ Extension of [glwind_codebase](https://github.com/windysensors/glwind_codebase/)
 
 This will be where I put my work for Fall 2024, especially that towards improving the poster for the November 2024 APS DFD meeting in SLC.
 
+This is kind of a mess at the moment, I need to clean stuff up.
+
 Required Python packages
 -----------------------
 numpy
