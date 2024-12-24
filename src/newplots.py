@@ -248,15 +248,45 @@ def plot_terrain_monthly(
         other = True,
         proportions = False
 ):
-    data = terrain_breakdown_monthly(data=data, height=height, radius=radius, other=other, total=False)[int(proportions)]
-    last = 0
-    for tc in terrain_classes + other * ['Other']:
-        y = data[tc.title()]
-        plt.bar(months, y, bottom = last, label = tc.title())
-        last += y
-    plt.title('Terrain Breakdown')
-    plt.legend()
-    plt.show()
+    if proportions:
+        data, props = terrain_breakdown_monthly(data=data, height=height, radius=radius, other = True, total=False)
+        last_num = pd.Series(np.zeros(len(months), dtype=int))
+        last_y = last_num.copy()
+        for tc in terrain_classes + other * ['Other']:
+            num = data[tc.title()].reset_index(drop = True)
+            y = props[tc.title()].reset_index(drop = True)
+            plt.bar(months, y, bottom = last_y, label = tc.title())
+            for i in range(len(months)):
+                plt.text(i, last_y.iloc[i]+y.iloc[i]/2, f'{num.iloc[i]}\n({(100*y.iloc[i]):.1f}%)', ha='center', va='center')
+            last_num += num
+            last_y += y
+        if other:
+            top_offset = np.max(last_y) / 150
+            for i in range(len(months)):
+                plt.text(i, last_y.iloc[i] + top_offset, last_num.iloc[i], ha='center')
+        plt.title(f'Terrain Breakdown (Proportions of Total)\nBased on {height}m wind directions, direction cone radius of {radius} degrees')
+        plt.ylabel('Fraction')
+        plt.xlabel('Month')
+        plt.legend()
+        plt.show()
+    else:
+        data = terrain_breakdown_monthly(data=data, height=height, radius=radius, other = True, total=False)[0]
+        last = pd.Series(np.zeros(len(months), dtype=int))
+        for tc in terrain_classes + other * ['Other']:
+            num = data[tc.title()].reset_index(drop = True)
+            plt.bar(months, num, bottom = last, label = tc.title())
+            for i in range(len(months)):
+                plt.text(i, last.iloc[i]+num.iloc[i]/2, num.iloc[i], ha='center', va='center')
+            last += num
+        if other:
+            top_offset = np.max(last) / 150
+            for i in range(len(months)):
+                plt.text(i, last.iloc[i] + top_offset, last.iloc[i], ha='center')
+        plt.title(f'Terrain Breakdown\nBased on {height}m wind directions, direction cone radius of {radius} degrees')
+        plt.ylabel('Number of Data Points')
+        plt.xlabel('Month')
+        plt.legend()
+        plt.show()
 
 def print_terrain_monthly(
         data = df10,
@@ -443,4 +473,5 @@ if __name__ == '__main__':
     # alpha_vs_timeofday_with_seasons(terrain = 'complex')
 
     print_terrain_monthly()
-    plot_terrain_monthly(proportions=True)
+    plot_terrain_monthly(other = False, proportions=True)
+    plot_terrain_monthly(other = True, proportions=False)
