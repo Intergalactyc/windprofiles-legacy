@@ -116,13 +116,31 @@ def alpha_vs_ri(d=False):
     plt.show()
     return
 
-def plot_alpha(d=False):
-    plt.title('WSE over time, with comparison to temperature')
-    plt.scatter(df10['time'],df10['alpha'],s=0.4, label = r'$\alpha$')
+def plot_alpha(tcolor = False, d = False, temp = None, avail = False, speed = None, title = True):
+    if title:
+        plt.title('WSE over time' + (temp is not None) * ', with comparison to temperature' + (speed is not None or avail) * ', and other details')
+    if tcolor:
+        for tc in ['open', 'complex', 'other']:
+            df10_tc = df10[df10['terrain'] == tc]
+            plt.scatter(df10_tc['time'], df10_tc['alpha'], s = 0.4, label = tc)
+    else:
+        plt.scatter(df10['time'],df10['alpha'],s=0.4, label = r'$\alpha$')
     if d: plt.plot(df10['time'],[1/7]*len(df10))
-    plt.scatter(df10['time'],df10['t_10m']/50-4, s=0.3, label = r'$T/(50\text{ K})-4$')
+    if temp is not None:
+        plt.scatter(df10['time'],df10['t_10m']/50-4, s=0.3, label = r'$T/(50\text{ K})-4$' + f'({temp} m)')
+    if avail:
+        plt.scatter(df10['time'], df10['availability'], label='availability', s=0.5)
+    plt.gca().legend(loc='upper left')
+    if speed is not None:
+        ogax = plt.gca()
+        twinax = ogax.twinx()
+        for h in speed:
+            twinax.plot(df10['time'], df10[f'ws_{h}m'], linewidth=0.2, linestyle='dashed', label=f'ws_{h}m')
+        twinax.legend(loc='upper right')
+        ogax.set_zorder(1)
+        ogax.set_frame_on(False)
     plt.xlabel('time')
-    plt.legend()
+    plt.tight_layout()
     plt.show()
     return
 
@@ -245,8 +263,7 @@ def stats_ri(restriction = [5.]):
 
 def total_data_available():
     N = len(heights)
-    availableData = df10.apply(lambda row : N-np.sum([int(pd.isna(row[f'ws_{height}m'])) for height in heights]), axis = 1)
-    plt.scatter(df10['time'], availableData)
+    plt.scatter(df10['time'], df10['availability'])
     plt.show()
     return
 
@@ -304,5 +321,7 @@ if __name__ == '__main__':
     #plot_speeds()
     #total_data_available()
     #boom_data_available()
-    #plot_alpha()
-    alpha_vs_timeofday()
+    #plot_alpha(temp=10,avail=True,speed=[6,10,20,32,106],title=False)
+    plot_alpha(tcolor=True)
+    #alpha_vs_timeofday()
+    #df1 = pd.read_csv('../../outputs/slow/combined.csv')

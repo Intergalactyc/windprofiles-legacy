@@ -10,6 +10,7 @@ from sun_position_calculator import SunPositionCalculator
 # Load data
 df10 = pd.read_csv('../../outputs/slow/ten_minutes_labeled.csv') # 10-minute averaged data, with calculations and labeling performed by reduce.py
 df10['time'] = pd.to_datetime(df10['time'])
+df10['local_time'] = df10['time'].dt.tz_localize('UTC').dt.tz_convert('US/Central') # add a local time column
 
 # List of all of the heights, in m, that data exists at
 heights = [6,10,20,32,80,106]
@@ -148,7 +149,17 @@ def fits_by_stability_and_month(
             result.loc[month, sc.title()] = wsc
     return result
 
-def plot_fits_summary(data, cmap = 'viridis', pretitle = 'All Data', saveto = None, minmax = (0,0.65), percent = None):
+def plot_fits_summary(data,
+                      cmap = 'viridis',
+                      pretitle = 'All Data',
+                      saveto = None,
+                      minmax = (0,0.65),
+                      percent = None,
+                      clabel = r'$\alpha$',
+                      xlabel = 'Month',
+                      ylabel = 'Stability Class',
+                      title = r'Wind Shear Exponent $\alpha$ by Month and Stability Classification'
+    ):
     data = data.astype(np.float64).T
     # first plot
     if percent is not None: 
@@ -156,7 +167,7 @@ def plot_fits_summary(data, cmap = 'viridis', pretitle = 'All Data', saveto = No
     fig, ax = plt.subplots(figsize=(10,6))
     cax = ax.imshow(data.values, cmap = cmap, vmin = minmax[0], vmax = minmax[1], aspect = 'auto')
     cbar = fig.colorbar(cax)
-    cbar.set_label(r'$\alpha$')
+    cbar.set_label(cabel)
     ax.set_xticks(np.arange(len(data.columns)))
     ax.set_xticklabels(data.columns)
     ax.set_yticks(np.arange(len(data.index)))
@@ -167,9 +178,9 @@ def plot_fits_summary(data, cmap = 'viridis', pretitle = 'All Data', saveto = No
                 ax.text(j, i, f'{data.values[i, j]:.3f}' + f'\n({percent.values[i, j]:.0f}%)', ha='center', va='center', color='white', weight = 'bold')
             else:
                 ax.text(j, i, f'{data.values[i, j]:.3f}', ha='center', va='center', color='white', weight = 'bold')
-    ax.set_xlabel('Month')
-    ax.set_ylabel('Stability Class')
-    fig.suptitle(pretitle + '\n' + r'Wind Shear Exponent $\alpha$ by Month and Stability Classification')
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    fig.suptitle(pretitle + '\n' + title)
     plt.tight_layout()
     if saveto is not None and type(saveto) is str:
         plt.savefig(saveto)
@@ -178,6 +189,88 @@ def plot_fits_summary(data, cmap = 'viridis', pretitle = 'All Data', saveto = No
         plt.show()
     # second plot
     #plt.scatter()
+
+# def terrain_breakdown(
+#         height = 10,
+#         radius = 15
+# ):
+#     result = pd.DataFrame(index = months, columns = [tc.title() for tc in terrain_classes + ['other']])
+#     for num, month in enumerate(months, 1):
+#         df_mon = data[data['time'].dt.month==num]
+#         for sc in stability_classes:
+#             dfMsc = df_mon[df_mon[stability_parameter].apply(stability_scheme) == sc]
+#             means = dfMsc[[f'ws_{h}m' for h in heights]].mean(axis = 0)
+#             _, wsc = hf.power_fit(heights, means.values, both=True)
+#             result.loc[month, sc.title()] = wsc
+#     return result
+    
+# def plot_terrain_summary(
+#         height = 10,
+#         radius = 15
+# ):
+#     result = terrain_breakdown(height=height, radius=radius)
+
+#     plot_fits_summary(data=result,
+#                       minmax)
+#     fig, ax = plt.subplots(figsize = (10,6))
+#     for tc in terrain_classes + ['other']:
+#         df = df10[df10[f'wd_{int(height)}m'].apply(lambda dir : hf.terrain_class(dir, radius = radius)) == tc]
+
+def terrain_breakdown_monthly(
+        data = df10,
+        height = 10,
+        radius = 15,
+        other = True,
+        total = True
+):
+    result = pd.DataFrame(index = months + total * ['Total'], columns = [tc.title() for tc in terrain_classes + ['other']])
+    proportions = result.copy()
+    for num, month in enumerate(months + total * ['Total'], 1):
+        if month == 'Total':
+            df_mon = data
+        else:
+            df_mon = data[data['time'].dt.month==num]
+        for tc in terrain_classes + other * ['other']:
+            count_tc = len(df_mon[df_mon[f'wd_{int(height)}m'].apply(lambda dir : hf.terrain_class(dir, radius = radius)) == tc])
+            result.loc[month, tc.title()] = count_tc
+            proportions.loc[month, tc.title()] = count_tc / len(df_mon)
+        #proportions.loc[month, 'Total'] = len(df_mon)
+    return result, proportions
+            # dfMsc = df_mon[df_mon[stability_parameter].apply(stability_scheme) == sc]
+            # means = dfMsc[[f'ws_{h}m' for h in heights]].mean(axis = 0)
+            # _, wsc = hf.power_fit(heights, means.values, both=True)
+            # result.loc[month, sc.title()] = wsc
+
+def plot_terrain_monthly(
+        data = df10,
+        height = 10,
+        radius = 15,
+        other = True,
+        proportions = False
+):
+    data = terrain_breakdown_monthly(data=data, height=height, radius=radius, other=other, total=False)[int(proportions)]
+    last = 0
+    for tc in terrain_classes + other * ['Other']:
+        y = data[tc.title()]
+        plt.bar(months, y, bottom = last, label = tc.title())
+        last += y
+    plt.title('Terrain Breakdown')
+    plt.legend()
+    plt.show()
+
+def print_terrain_monthly(
+        data = df10,
+        height = 10,
+        radius = 15,
+        other = True,
+        total = True,
+):
+    data = terrain_breakdown_monthly(data=data, height=height, radius=radius, other=other, total=total)
+    print('Terrain breakdown (number of data points):')
+    print(data[0])
+    print('\n')
+    print('Terrain breakdown (proportions):')
+    print(data[1])
 
 def fits_process_all(
     stability = default_stability,
@@ -263,10 +356,16 @@ def alpha_vs_timeofday_with_terrain(month = None, height = 10, errorbars = False
     plt.tight_layout()
     plt.show()
 
-def alpha_vs_timeofday_with_seasons():
+def alpha_vs_timeofday_with_seasons(terrain = None, height = 10):
+    if terrain in terrain_classes:
+        dfT = df10[df10[f'wd_{int(height)}m'].apply(hf.terrain_class) == terrain].copy()
+        tcstring = terrain.title() + f' based on {height}m'
+    else:
+        dfT = df10.copy()
+        tcstring =  'All Data'
     for S, mons in seasons.items():
         monnums = [months.index(m)+1 for m in mons]
-        dfS = df10[df10['time'].dt.month.isin(monnums)].copy()
+        dfS = dfT[dfT['time'].dt.month.isin(monnums)].copy()
         dfS['secondsintoday'] = (dfS['time'].dt.hour * 60 + dfS['time'].dt.minute) * 60 + dfS['time'].dt.second 
         uniquetimes = np.sort(dfS['secondsintoday'].unique())
         means = [dfS[dfS['secondsintoday'] == time]['alpha'].mean() for time in uniquetimes]
@@ -274,7 +373,7 @@ def alpha_vs_timeofday_with_seasons():
     plt.legend()
     plt.xlabel('Time of day (seconds past midnight UTC)')
     plt.ylabel(r'$\alpha$')
-    plt.title(f'Mean WSE vs Time of Day, by Season')
+    plt.title(f'Mean WSE vs Time of Day, by Season ({tcstring})')
     plt.tight_layout()
     plt.show()
 
@@ -332,9 +431,16 @@ if __name__ == '__main__':
     #     stability_plots(stability = default_stability, height = h)
     #stability_plots(stability = five_stability)
     #alpha_vs_timeofday()
-    #alpha_vs_timeofday_with_seasons()
+
     #alpha_vs_timeofday_with_terrain(height = 10)
     #alpha_vs_timeofday_with_terrain(height = 6)
     # temperature_vs_timeofday_with_seasons()
     #combine_alpha_temperature_seasonality_plots()
     #alpha_vs_sun_altitude()
+
+    # alpha_vs_timeofday_with_seasons()
+    # alpha_vs_timeofday_with_seasons(terrain = 'open')
+    # alpha_vs_timeofday_with_seasons(terrain = 'complex')
+
+    print_terrain_monthly()
+    plot_terrain_monthly(proportions=True)

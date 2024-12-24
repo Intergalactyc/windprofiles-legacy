@@ -103,6 +103,11 @@ def polar_average(magnitudes, directions):
     yavg = np.mean(ys)
     return polar_wind(xavg, yavg)
 
+def angular_distance(alpha, beta):
+    # returns unsigned angular distance between alpha and beta
+    d0 = (alpha-beta) % 360
+    return min(360-d0, d0)
+
 def top_cond_avg(s1,s2,d1,d2,width=30):
     # Given speeds and uncorrected directions for booms 6 and 7 (6 in s1,d1, 7 in s2,d2),
     # finds the best choice of wind speed/direction at 106m:
@@ -167,10 +172,12 @@ def new_class(rat):
         return 'neutral'
     return 'stable'
 
-def terrain_class(direction):
-    if 300. <= direction <= 330.:
+def terrain_class(direction, radius = 15, complex_center = 315, open_center = 135):
+    if 2 * radius > angular_distance(complex_center, open_center):
+        print('warning: terrain class radius is greater than half the difference between regions.')
+    if angular_distance(direction, complex_center) < radius:
         return "complex" # northwest = complex
-    elif 120. <= direction <= 150.:
+    elif angular_distance(direction, open_center) < radius:
         return "open" # southeast = open
     else:
         return "other"
@@ -198,7 +205,7 @@ def ls_linear_fit(xvals, yvals):
     B = (n * sum_xy - sum_x * sum_y)/det
     return A, B
 
-def power_fit(xvals, yvals, both=False):
+def power_fit(xvals, yvals, both=False, require = 2):
     # Least squares fit to relationship y = a*x^b
     # Outputs a pair a,b describing fit
     # The b is exactly the wind shear coefficient for wind p.l. fit
@@ -208,6 +215,10 @@ def power_fit(xvals, yvals, both=False):
         if not (math.isnan(x) or math.isnan(y)):
             xconsider.append(x)
             yconsider.append(y)
+    if len(yconsider) < require:
+        if both:
+            return np.nan, np.nan
+        return np.nan
     lnA, B = ls_linear_fit(np.log(xconsider),np.log(yconsider))
     if both:
         return np.exp(lnA), B

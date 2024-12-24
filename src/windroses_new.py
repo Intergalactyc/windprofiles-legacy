@@ -18,33 +18,6 @@ winddata = (
         .rename(columns = {f'ws_{height}m' : 'ws', f'wd_{height}m' : 'wd'})
     )
 
-"""
-fig, ax = plt.subplots()
-start_date = df10.loc[0,'time']#.date()
-end_date = df10.loc[len(df10)-1,'time']#.date()
-#print(start_date,end_date)
-artists = []
-dates = pd.date_range(
-    start = start_date,
-    end = end_date
-    )
-for date in dates[:10]:
-    data_date = winddata[winddata['time'].dt.date == date]
-    wr_date = roses.windrose(data_date)
-    artists.append(wr_date)
-ani = anim.ArtistAnimation(fig = fig, artists = artists, interval = 100)
-plt.show()
-"""
-
-"""
-fig = plt.figure()
-
-ax1 = fig.add_subplot()
-ax1.scatter(df10['ri'],df10['ws_106m'])
-ax2 = fig.add_subplot()
-ax2.sca
-"""
-
 start_date = df10.loc[0,'time']
 end_date = df10.loc[len(df10)-1,'time']
 dates = pd.date_range(
@@ -64,8 +37,14 @@ for date in tqdm(dates):
     artist.set_title(date.date())
     artists.append([artist])
 wr_anim = anim.ArtistAnimation(fig = fig, artists = artists, interval = 200)
-#ffmpeg_path = 'C:/ffmpeg/bin/ffmpeg.exe'  # Adjust this to your FFmpeg location
+#ffmpeg_path = 'C:/ffmpeg/bin/ffmpeg.exe'
 #writervideo = anim.FFMpegWriter(fps=10, metadata=dict(artist='Me'), bitrate=1800, codec="libx264")
 #writervideo.exec_command = lambda *args: subprocess.Popen([ffmpeg_path] + list(args))
 #wr_anim.save('../../outputs/animationTEST.mp4', writer=writervideo)
 plt.show()
+
+
+
+
+# ADD A WAY OF SHOWING THE TERRAIN DELIMITATIONS
+# WANT SEASONAL WIND ROSES WITH THIS IN PLACE!

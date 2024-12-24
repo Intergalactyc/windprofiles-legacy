@@ -12,6 +12,7 @@ import helper_functions as hf
 
 # Manual changes made to data: removed -2 at end of a few file names; changed Boom1 dates from xx -> 20xx so pd can process as datetimes
 
+zeroOmission = False
 SPEED_THRESHOLD = 0.1 # minimum speed threshold of wind speed sensors
 clear_threshold = False # replace wind direction where speed is below this threshold to NaN, and speed to 0
 
@@ -82,10 +83,16 @@ for column in df.columns:
         # convert relative humidity from % to decimal
         df[column] = df[column] / 100.
     elif 'ws_' in column:
-        # when wind speeds are 0, set the direction to nan
-        # choosing not to eliminate those below the measurement threshold for now
-        dircol = 'wd_' + column.split('_')[1][:-1] + 'm'
-        df.loc[df[column] == 0, dircol] = np.nan
+        # when wind speeds are 0, set direction to NaN (SET SPEED AND DIRECTION BOTH TO NAN if zeroOmission on)
+        # choosing not to eliminate those below the measurement threshold for now (if clear_threshold is False)
+        heightStr = column.split('_')[1][:-1]
+        dircol = f'wd_{heightStr}m'
+        if zeroOmission:
+            rowsToSet = len(df[df[column] == 0])
+            print(f'Rows containing 0 wind speed at {heightStr}m: {rowsToSet}')
+            df.loc[df[column] == 0, [dircol, column]] = np.nan
+        else:
+            df.loc[df[column] == 0, dircol] = np.nan
         if clear_threshold:
             df.loc[df[column] < SPEED_THRESHOLD, dircol] = np.nan
             df.loc[df[column] < SPEED_THRESHOLD, column] = 0
