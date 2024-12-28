@@ -52,11 +52,14 @@ for h in heights:
 
 # Remove data according to REMOVAL_PERIODS
 df_10_min_avg.reset_index(inplace=True, names='time')
+total_removals = 0
+partial_removals = 0
 for interval, which_heights in REMOVAL_PERIODS.items():
     removal_start, removal_end = interval
     indices = df_10_min_avg.loc[df_10_min_avg['time'].between(removal_start, removal_end, inclusive='both')].index #df_10_min_avg.index.indexer_between_time(removal_start, removal_end)
     if which_heights == 'ALL' or which_heights == heights: # if all data is to be removed, just drop the entries from the dataframe altogether
         df_10_min_avg.drop(index=indices, inplace=True)
+        total_removals += len(indices)
     else: # otherwise just set data from the selected heights to NaN
         datatypes = ['p','ws','wd','t','rh']
         for h in which_heights:
@@ -64,7 +67,10 @@ for interval, which_heights in REMOVAL_PERIODS.items():
                 selection = f'{d}_{h}m'
                 if selection in df_10_min_avg.columns:
                     df_10_min_avg.loc[indices, selection] = np.nan
+        partial_removals += len(indices)
 df_10_min_avg.set_index('time', inplace=True)
+print(f"""Total removals: {total_removals}
+Partial removals: {partial_removals}""")
 
 # Booms with available 
 N = len(heights)

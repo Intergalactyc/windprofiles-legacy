@@ -246,7 +246,9 @@ def plot_terrain_monthly(
         height = 10,
         radius = 15,
         other = True,
-        proportions = False
+        show_totals = True,
+        proportions = False,
+        label_top = True
 ):
     if proportions:
         data, props = terrain_breakdown_monthly(data=data, height=height, radius=radius, other = True, total=False)
@@ -260,15 +262,14 @@ def plot_terrain_monthly(
                 plt.text(i, last_y.iloc[i]+y.iloc[i]/2, f'{num.iloc[i]}\n({(100*y.iloc[i]):.1f}%)', ha='center', va='center')
             last_num += num
             last_y += y
-        if other:
             top_offset = np.max(last_y) / 150
+        title_additional = ''
+        if 'open' in terrain_classes and 'complex' in terrain_classes:
             for i in range(len(months)):
-                plt.text(i, last_y.iloc[i] + top_offset, last_num.iloc[i], ha='center')
-        plt.title(f'Terrain Breakdown (Proportions of Total)\nBased on {height}m wind directions, direction cone radius of {radius} degrees')
+                plt.text(i, last_y.iloc[i] + top_offset, f'{(data['Open'].iloc[i]/data['Complex'].iloc[i]):.2f}', ha='center')
+            title_additional = '\nTop value is Open:Complex ratio'
+        plt.title(f'Terrain Breakdown (Proportions of Total)\nBased on {height}m wind directions, direction cone radius of {radius} degrees'+label_top*title_additional)
         plt.ylabel('Fraction')
-        plt.xlabel('Month')
-        plt.legend()
-        plt.show()
     else:
         data = terrain_breakdown_monthly(data=data, height=height, radius=radius, other = True, total=False)[0]
         last = pd.Series(np.zeros(len(months), dtype=int))
@@ -278,15 +279,22 @@ def plot_terrain_monthly(
             for i in range(len(months)):
                 plt.text(i, last.iloc[i]+num.iloc[i]/2, num.iloc[i], ha='center', va='center')
             last += num
-        if other:
-            top_offset = np.max(last) / 150
+        top_offset = np.max(last) / 150
+        title_additional = ''
+        if other and show_totals:
             for i in range(len(months)):
                 plt.text(i, last.iloc[i] + top_offset, last.iloc[i], ha='center')
-        plt.title(f'Terrain Breakdown\nBased on {height}m wind directions, direction cone radius of {radius} degrees')
+            title_additional = '\nTop value is total number of data points'
+        elif 'open' in terrain_classes and 'complex' in terrain_classes:
+            for i in range(len(months)):
+                plt.text(i, last.iloc[i] + top_offset, data['Complex'].iloc[i]/data['Open'].iloc[i], ha='center')
+            title_additional = '\nTop value is Open:Complex ratio'
+        plt.title(f'Terrain Breakdown\nBased on {height}m wind directions, direction cone radius of {radius} degrees'+label_top*title_additional)
         plt.ylabel('Number of Data Points')
-        plt.xlabel('Month')
-        plt.legend()
-        plt.show()
+    plt.xlabel('Month')
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
 
 def print_terrain_monthly(
         data = df10,
@@ -473,5 +481,5 @@ if __name__ == '__main__':
     # alpha_vs_timeofday_with_seasons(terrain = 'complex')
 
     print_terrain_monthly()
-    plot_terrain_monthly(other = False, proportions=True)
+    plot_terrain_monthly(other = False, proportions=True) # Do something like these with stability?
     plot_terrain_monthly(other = True, proportions=False)

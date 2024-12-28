@@ -103,7 +103,7 @@ def _convert_dir(directions, N=None):
 
     return barDir, barWidth
 
-def _rose_ax(fig, rosedata, bins, *, palette=None):
+def _rose_ax(fig, rosedata, bins, *, lines = dict(), palette=None):
     if palette is None:
         palette = sb.color_palette('inferno', n_colors=rosedata.shape[1])
     
@@ -139,9 +139,13 @@ def _rose_ax(fig, rosedata, bins, *, palette=None):
     ax.set_xticks(np.linspace(0, 2 * np.pi, 8, endpoint=False))
     ax.set_xticklabels(['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'])
 
+    #lcolors = ['red', 'blue']
+    #for category, angles in lines.items():
+    #    ax.vlines(angles, 0, 100)
+
     return ax
 
-def windrose(fig, winddata, *, mode='speed', bin_size=20, N_bins=None, palette=None, units='m/s'):
+def windrose(fig, winddata, *, mode='speed', bin_size=20, N_bins=None, palette=None, units='m/s', lines = {'complex' : (300,330), 'open' : (120,150)}):
     total_count = winddata.shape[0]
     
     if N_bins:
@@ -191,4 +195,4 @@ def windrose(fig, winddata, *, mode='speed', bin_size=20, N_bins=None, palette=N
     else:
         raise(f"Mode '{mode}' not found for plotting windrose.")
 
-    return _rose_ax(fig, rosedata, directions, palette=palette)
+    return _rose_ax(fig, rosedata, directions, lines=lines, palette=palette)
