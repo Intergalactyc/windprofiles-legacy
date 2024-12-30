@@ -52,7 +52,7 @@ def generate_rose(data = df10,
                   transparent = False,
                   ndata = True,
                   terrain_lines = True,
-                  terrain_alpha = 0.2,
+                  terrain_alpha = 0.15,
                   open = (300, 330),
                   complex = (120, 150),
                   nsector = 16,
@@ -83,8 +83,8 @@ def generate_rose(data = df10,
         max_r = ax.get_ylim()[1]
         open_rad = [np.deg2rad(deg) for deg in open]
         cmpl_rad = [np.deg2rad(deg) for deg in complex]
-        ax.vlines(open_rad, 0, max_r, color = 'blue')
-        ax.vlines(cmpl_rad, 0, max_r, color = 'red')
+        ax.vlines(open_rad, 0, max_r, color = 'blue', linestyle = 'dashed')
+        ax.vlines(cmpl_rad, 0, max_r, color = 'red', linestyle = 'dashed')
         if terrain_alpha > 0:
             ax.fill_between(
                 np.linspace(open_rad[0], open_rad[1], 100),

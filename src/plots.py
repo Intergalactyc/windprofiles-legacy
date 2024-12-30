@@ -1,5 +1,3 @@
-# primary generation of plots
-
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
@@ -7,31 +5,126 @@ from matplotlib import cm
 import numpy as np
 import helper_functions as hf
 import os
+from sun_position_calculator import SunPositionCalculator
 
-# note to self - the 4:30 ones are "Night", the 18:30 ones are "Noon"
-
+# Load data
 df10 = pd.read_csv('../../outputs/slow/ten_minutes_labeled.csv') # 10-minute averaged data, with calculations and labeling performed by reduce.py
 df10['time'] = pd.to_datetime(df10['time'])
+df10['local_time'] = df10['time'].dt.tz_localize('UTC').dt.tz_convert('US/Central') # add a local time column
 
-# Useful list of all of the heights, in m, that data exists at
+# List of all of the heights, in m, that data exists at
 heights = [6,10,20,32,80,106]
+zvals = np.linspace(0.,130.,400)
 
-stability_classes = [['unstable'],['neutral'],['stable'],['strongly stable']]
-combined_stability_classes = [['unstable'],['neutral'],['stable','strongly stable']]
+# Latitude and longitude
+CRLATITUDE = 41.91 # KCC met tower latitude in degrees
+CRLONGITUDE = -91.65 # Met tower longitude in degree
 
-def scatter_ri():
-    # Plot of Ri over time
-    plt.scatter(df10['time'], df10['ri'],s=0.1)
+# Months
+months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+seasons = {'Fall' : ['Sep', 'Oct', 'Nov'],
+           'Winter' : ['Dec', 'Jan', 'Feb'],
+           'Spring' : ['Mar', 'Apr', 'May'],
+           'Summer' : ['Jun', 'Jul', 'Aug']
+           }
+seasonal_colors = {'Fall' : 'orange', 'Summer' : 'red', 'Spring' : 'green', 'Winter' : 'blue'}
+
+# Terrain classes
+terrain_classes = ['complex', 'open']
+
+# How to classify stability by default
+default_stability_classes = ['unstable','neutral','stable','strongly stable']
+default_stability_cutoffs = ['Ri<-0.1','-0.1<Ri<0.1','0.1<Ri<0.25','Ri>0.25']
+default_stability = {'stability classes' : default_stability_classes,
+                     'stability cutoffs' : default_stability_cutoffs,
+                     'stability scheme' : hf.stability_class,
+                     'stability parameter' : 'ri',
+                     'colors' : ['red', 'lime', 'royalblue', 'midnightblue'],
+                     }
+
+# Five class scheme
+five_stability_classes = ['strongly unstable','unstable','neutral','stable','strongly stable']
+five_stability_cutoffs = ['Ri<-0.25','-0.25<Ri<-0.1','-0.1<Ri<0.1','0.1<Ri<0.25','Ri>0.25']
+def five_stability_scheme(Ri):
+    if Ri < -0.25:
+        return 'strongly unstable'
+    if Ri < -0.1:
+        return 'unstable'
+    if -0.1 <= Ri < 0.1:
+        return 'neutral'
+    if 0.1 <= Ri < 0.25:
+        return 'stable'
+    return 'strongly stable'
+five_stability = {'stability classes' : five_stability_classes,
+                     'stability cutoffs' : five_stability_cutoffs,
+                     'stability scheme' : five_stability_scheme,
+                     'stability parameter' : 'ri',
+                     'colors' : ['red', 'orange', 'lime', 'royalblue', 'midnightblue'],
+                     }
+
+def mean_wind_profiles_by_terrain_and_stability(
+    height = 10,
+    stability = default_stability
+):
+    stability_classes = stability['stability classes']
+    stability_parameter = stability['stability parameter']
+    stability_scheme = stability['stability scheme']
+    colors = stability['colors']
+    for tc in terrain_classes:
+        df = df10[df10[f'wd_{int(height)}m'].apply(hf.terrain_class) == tc]
+        plt.xlabel('Mean Velocity (m/s)')
+        plt.ylabel('Height (m)')
+        plt.title(f'{tc.title()} terrain wind profile')
+        for color, sc in zip(colors, stability_classes):
+            df_sc = df[df[stability_parameter].apply(stability_scheme) == sc]
+            means = df_sc[[f'ws_{h}m' for h in heights]].mean(axis=0)
+            mult, wsc = hf.power_fit(heights, means.values, both=True)
+            plt.scatter(means.values, heights, label=r'{sc}: $u(z)={a:.2f}z^{{{b:.3f}}}$'.format(sc=sc.title(),a=mult,b=wsc), color = color)
+            plt.plot(mult * zvals**wsc, zvals, color = color)
+            print(f'{tc}, {sc[0]}: mult = {mult:.4f}, alpha = {wsc:.4f}')
+        plt.legend()
+        plt.show()
+
+def mean_wind_profiles_by_stability_only(
+    stability = default_stability,
+):
+    stability_classes = stability['stability classes']
+    stability_parameter = stability['stability parameter']
+    stability_scheme = stability['stability scheme']
+    colors = stability['colors']
+    plt.xlabel('Mean Velocity (m/s)')
+    plt.ylabel('Height (m)')
+    plt.title(f'Overall mean wind profiles')
+    for color, sc in zip(colors, stability_classes):
+        df_sc = df10[df10[stability_parameter].apply(stability_scheme) == sc]
+        height_stratified = df_sc[[f'ws_{h}m' for h in heights]]
+        means = height_stratified.mean(axis = 0)
+        # stds = height_stratified.std(axis = 0)
+        mult, wsc = hf.power_fit(heights, means.values, both=True)
+        plt.scatter(means.values, heights, label=r'{sc}: $u(z)={a:.2f}z^{{{b:.3f}}}$'.format(sc=sc.title(),a=mult,b=wsc), color = color)
+        # Error bar - looks very bad
+        # plt.errorbar(means.values, heights, xerr = stds.values, fmt = 'o', elinewidth = 0, capthick = 1.5, capsize = 4, label=r'{sc}: $u(z)={a:.2f}z^{{{b:.3f}}}$'.format(sc=sc.title(),a=mult,b=wsc), color = color)
+        plt.plot(mult * zvals**wsc, zvals, color = color)
+        print(f'{sc[0]}: mult = {mult:.4f}, alpha = {wsc:.4f}')
+    plt.legend()
     plt.show()
-    return
 
-def bar_stability(combine=False):
+def bar_stability(
+    stability = default_stability,
+):
+    stability_classes = stability['stability classes']
+    stability_parameter = stability['stability parameter']
+    stability_scheme = stability['stability scheme']
+    stability_cutoffs = stability['stability cutoffs']
+    colors = stability['colors']
+    N = len(stability_classes)
+    if len(stability_cutoffs) != N:
+        raise('Mismatch in stability setup list lengths')
     # Bar chart of stability classifications
-    stability_r_freqs = df10['stability'].value_counts(normalize=True)
-    if combine:
-        plt.bar(['Unstable\n(Ri<-0.1)','Neutral\n(-0.1<Ri<0.1)','Stable\n(0.1<Ri)'],[stability_r_freqs['unstable'],stability_r_freqs['neutral'],stability_r_freqs['stable']+stability_r_freqs['strongly stable']], color=['mediumblue','deepskyblue','orange'])
-    else:
-        plt.bar(['Unstable\n(Ri<-0.1)','Neutral\n(-0.1<Ri<0.1)','Stable\n(0.1<Ri<0.25)','Strongly Stable\n(0.25<Ri)'],[stability_r_freqs['unstable'],stability_r_freqs['neutral'],stability_r_freqs['stable'],stability_r_freqs['strongly stable']], color=['mediumblue','deepskyblue','orange','crimson'])
+    classifications = df10[stability_parameter].apply(stability_scheme)
+    stability_r_freqs = classifications.value_counts(normalize=True)
+    plt.bar([f'{stability_classes[i].title()}\n({stability_cutoffs[i]})' for i in range(N)], [stability_r_freqs[sc] for sc in stability_classes], color = colors)
+    #plt.bar(['Unstable\n(Ri<-0.1)','Neutral\n(-0.1<Ri<0.1)','Stable\n(0.1<Ri<0.25)','Strongly Stable\n(0.25<Ri)'],[stability_r_freqs['unstable'],stability_r_freqs['neutral'],stability_r_freqs['stable'],stability_r_freqs['strongly stable']], color=['mediumblue','deepskyblue','orange','crimson'])
     plt.ylabel('Relative Frequency')
     plt.title('Wind Data Sorted by Bulk Ri Thermal Stability Classification')
     plt.xticks(rotation=0)
@@ -39,44 +132,387 @@ def bar_stability(combine=False):
     plt.show()
     return
 
-"""
-def bar_new(save=False):
-    # Bar chart of stability classifications
-    stability_r_freqs = df10['new_stability'].value_counts(normalize=True)
-    plt.bar(['unstable','neutral','stable'],[stability_r_freqs['unstable'],stability_r_freqs['neutral'],stability_r_freqs['stable']], color=['mediumblue','deepskyblue','orange'])#,'crimson'])
-    plt.ylabel('relative frequency')
-    plt.title('frequency of wind data sorted by new stability classification')
-    plt.xticks(rotation=0)
-    plt.grid(axis='y', linestyle='-', alpha=0.8)
-    if save:
-        plt.savefig('plots/week3pres/newbar.png')
+def fits_by_stability_and_month(
+    stability = default_stability,
+    data = df10
+):
+    stability_classes = stability['stability classes']
+    stability_parameter = stability['stability parameter']
+    stability_scheme = stability['stability scheme']
+    result = pd.DataFrame(index = months, columns = [sc.title() for sc in stability_classes])
+    for num, month in enumerate(months, 1):
+        df_mon = data[data['time'].dt.month==num]
+        for sc in stability_classes:
+            dfMsc = df_mon[df_mon[stability_parameter].apply(stability_scheme) == sc]
+            means = dfMsc[[f'ws_{h}m' for h in heights]].mean(axis = 0)
+            _, wsc = hf.power_fit(heights, means.values, both=True)
+            result.loc[month, sc.title()] = wsc
+    return result
+
+def plot_fits_summary(data,
+                      cmap = 'viridis',
+                      pretitle = 'All Data',
+                      saveto = None,
+                      minmax = (0,0.65),
+                      percent = None,
+                      clabel = r'$\alpha$',
+                      xlabel = 'Month',
+                      ylabel = 'Stability Class',
+                      title = r'Wind Shear Exponent $\alpha$ by Month and Stability Classification'
+    ):
+    data = data.astype(np.float64).T
+    # first plot
+    if percent is not None: 
+        percent = percent.astype(np.float64).T
+    fig, ax = plt.subplots(figsize=(10,6))
+    cax = ax.imshow(data.values, cmap = cmap, vmin = minmax[0], vmax = minmax[1], aspect = 'auto')
+    cbar = fig.colorbar(cax)
+    cbar.set_label(cabel)
+    ax.set_xticks(np.arange(len(data.columns)))
+    ax.set_xticklabels(data.columns)
+    ax.set_yticks(np.arange(len(data.index)))
+    ax.set_yticklabels(data.index)
+    for i in range(len(data.index)):
+        for j in range(len(data.columns)):
+            if percent is not None:
+                ax.text(j, i, f'{data.values[i, j]:.3f}' + f'\n({percent.values[i, j]:.0f}%)', ha='center', va='center', color='white', weight = 'bold')
+            else:
+                ax.text(j, i, f'{data.values[i, j]:.3f}', ha='center', va='center', color='white', weight = 'bold')
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    fig.suptitle(pretitle + '\n' + title)
+    plt.tight_layout()
+    if saveto is not None and type(saveto) is str:
+        plt.savefig(saveto)
+        plt.close()
     else:
         plt.show()
-    return
-"""
+    # second plot
+    #plt.scatter()
 
-def bar_directions():
-    # Bar chart of direction-based terrain classifications
-    dir_r_freqs = df10['terrain'].value_counts(normalize=True)
-    plt.bar(dir_r_freqs.index, dir_r_freqs.values, color=['red','green','blue'])
-    plt.ylabel('relative frequency')
-    plt.title('frequency of wind data sorted by terrain classification')
-    plt.xticks(rotation=0)
-    plt.grid(axis='y', linestyle='-', alpha=0.8)
+# def terrain_breakdown(
+#         height = 10,
+#         radius = 15
+# ):
+#     result = pd.DataFrame(index = months, columns = [tc.title() for tc in terrain_classes + ['other']])
+#     for num, month in enumerate(months, 1):
+#         df_mon = data[data['time'].dt.month==num]
+#         for sc in stability_classes:
+#             dfMsc = df_mon[df_mon[stability_parameter].apply(stability_scheme) == sc]
+#             means = dfMsc[[f'ws_{h}m' for h in heights]].mean(axis = 0)
+#             _, wsc = hf.power_fit(heights, means.values, both=True)
+#             result.loc[month, sc.title()] = wsc
+#     return result
+    
+# def plot_terrain_summary(
+#         height = 10,
+#         radius = 15
+# ):
+#     result = terrain_breakdown(height=height, radius=radius)
+
+#     plot_fits_summary(data=result,
+#                       minmax)
+#     fig, ax = plt.subplots(figsize = (10,6))
+#     for tc in terrain_classes + ['other']:
+#         df = df10[df10[f'wd_{int(height)}m'].apply(lambda dir : hf.terrain_class(dir, radius = radius)) == tc]
+
+def terrain_breakdown_monthly(
+        data = df10,
+        height = 10,
+        radius = 15,
+        other = True,
+        total = True
+):
+    result = pd.DataFrame(index = months + total * ['Total'], columns = [tc.title() for tc in terrain_classes + ['other']])
+    proportions = result.copy()
+    for num, month in enumerate(months + total * ['Total'], 1):
+        if month == 'Total':
+            df_mon = data
+        else:
+            df_mon = data[data['time'].dt.month==num]
+        for tc in terrain_classes + other * ['other']:
+            count_tc = len(df_mon[df_mon[f'wd_{int(height)}m'].apply(lambda dir : hf.terrain_class(dir, radius = radius)) == tc])
+            result.loc[month, tc.title()] = count_tc
+            proportions.loc[month, tc.title()] = count_tc / len(df_mon)
+        #proportions.loc[month, 'Total'] = len(df_mon)
+    return result, proportions
+            # dfMsc = df_mon[df_mon[stability_parameter].apply(stability_scheme) == sc]
+            # means = dfMsc[[f'ws_{h}m' for h in heights]].mean(axis = 0)
+            # _, wsc = hf.power_fit(heights, means.values, both=True)
+            # result.loc[month, sc.title()] = wsc
+
+def plot_terrain_monthly(
+        data = df10,
+        height = 10,
+        radius = 15,
+        other = True,
+        show_totals = True,
+        proportions = False,
+        label_top = True
+):
+    if proportions:
+        data, props = terrain_breakdown_monthly(data=data, height=height, radius=radius, other = True, total=False)
+        last_num = pd.Series(np.zeros(len(months), dtype=int))
+        last_y = last_num.copy()
+        for tc in terrain_classes + other * ['Other']:
+            num = data[tc.title()].reset_index(drop = True)
+            y = props[tc.title()].reset_index(drop = True)
+            plt.bar(months, y, bottom = last_y, label = tc.title())
+            for i in range(len(months)):
+                plt.text(i, last_y.iloc[i]+y.iloc[i]/2, f'{num.iloc[i]}\n({(100*y.iloc[i]):.1f}%)', ha='center', va='center')
+            last_num += num
+            last_y += y
+            top_offset = np.max(last_y) / 150
+        title_additional = ''
+        if 'open' in terrain_classes and 'complex' in terrain_classes:
+            for i in range(len(months)):
+                plt.text(i, last_y.iloc[i] + top_offset, f'{(data['Open'].iloc[i]/data['Complex'].iloc[i]):.2f}', ha='center')
+            title_additional = '\nTop value is Open:Complex ratio'
+        plt.title(f'Terrain Breakdown (Proportions of Total)\nBased on {height}m wind directions, direction cone radius of {radius} degrees'+label_top*title_additional)
+        plt.ylabel('Fraction')
+    else:
+        data = terrain_breakdown_monthly(data=data, height=height, radius=radius, other = True, total=False)[0]
+        last = pd.Series(np.zeros(len(months), dtype=int))
+        for tc in terrain_classes + other * ['Other']:
+            num = data[tc.title()].reset_index(drop = True)
+            plt.bar(months, num, bottom = last, label = tc.title())
+            for i in range(len(months)):
+                plt.text(i, last.iloc[i]+num.iloc[i]/2, num.iloc[i], ha='center', va='center')
+            last += num
+        top_offset = np.max(last) / 150
+        title_additional = ''
+        if other and show_totals:
+            for i in range(len(months)):
+                plt.text(i, last.iloc[i] + top_offset, last.iloc[i], ha='center')
+            title_additional = '\nTop value is total number of data points'
+        elif 'open' in terrain_classes and 'complex' in terrain_classes:
+            for i in range(len(months)):
+                plt.text(i, last.iloc[i] + top_offset, data['Complex'].iloc[i]/data['Open'].iloc[i], ha='center')
+            title_additional = '\nTop value is Open:Complex ratio'
+        plt.title(f'Terrain Breakdown\nBased on {height}m wind directions, direction cone radius of {radius} degrees'+label_top*title_additional)
+        plt.ylabel('Number of Data Points')
+    plt.xlabel('Month')
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+def print_terrain_monthly(
+        data = df10,
+        height = 10,
+        radius = 15,
+        other = True,
+        total = True,
+):
+    data = terrain_breakdown_monthly(data=data, height=height, radius=radius, other=other, total=total)
+    print('Terrain breakdown (number of data points):')
+    print(data[0])
+    print('\n')
+    print('Terrain breakdown (proportions):')
+    print(data[1])
+
+def fits_process_all(
+    stability = default_stability,
+    height = 10,
+    cmap = 'viridis',
+    saveplots = True,
+    directory = '../../outputs/results/seasonality/',
+):
+    # all data
+    fits_SM = fits_by_stability_and_month(stability = default_stability)
+    fits_SM.to_csv(directory + f'fitsSM.csv', index_label='Month')
+    plot_fits_summary(data = fits_SM, saveto = directory + f'fitsSM' if saveplots else None)
+    # terrain classes
+    results_by_tc = dict()
+    for tc in terrain_classes:
+        df = df10[df10[f'wd_{int(height)}m'].apply(hf.terrain_class) == tc]
+        result_tc = fits_by_stability_and_month(stability = stability, data = df)
+        result_tc.to_csv(directory + f'{int(height)}m/' + f'{tc}_fitsSM_{int(height)}m.csv', index_label='Month')
+        results_by_tc[tc] = result_tc
+        plot_fits_summary(data = result_tc, cmap = cmap, pretitle = tc.title() + f' Terrain (based on {int(height)}m directions)', saveto = directory + f'{int(height)}m/' + f'{tc}_fitsSM_{int(height)}m' if saveplots else None)
+    deviation = results_by_tc['complex'] - results_by_tc['open']
+    greater = results_by_tc['complex'].combine(results_by_tc['open'], np.maximum)
+    percent = 100 * deviation / greater
+    plot_fits_summary(data = deviation, cmap = cmap, pretitle = f'COMPLEX - OPEN DISCREPANCIES (based on {int(height)}m directions)', saveto = directory + f'{int(height)}m/' + f'discrepancy_{int(height)}m' if saveplots else None, minmax = (-0.2,0.2), percent = percent)
+
+def terrain_by_month(height = 10,
+                     cmap = 'viridis'):
+    pass
+
+def stability_plots(height = 10, stability = default_stability, cmap = 'viridis'):
+    #mean_wind_profiles_by_stability_only(stability = stability)
+    #mean_wind_profiles_by_terrain_and_stability(height = height, stability = stability)
+    #bar_stability(stability = stability)
+    fits_process_all(stability = stability, height = height, cmap = cmap)
+    terrain_by_month(height = height, cmap = cmap)
+    # NEXT DO SOMETHING LIKE THE FITS_PROCESS_ALL THING BUT INSTEAD GIVING A BREAKDOWN OF HOW MUCH DATA IS IN EACH TERRAIN CLASS MONTHLY
+        # ** TERRAIN CLASS BREAKDOWN BY MONTH **
+        # RI HISTOGRAM BY MONTH?
+            # MEDIAN RI BY MONTH?
+        # RI HISTOGRAM BY TERRAIN TYPE?
+        # ALSO FOR FITS_PROCESS_ALL MAYBE PLOT THE DIFFERENCES COMPLEX - OPEN
+            # + OPEN QUESTION OF SENSITIVITY TO TERRAIN WINDOW WIDTH (EXTEND TO 45 OR 60 DEGREES (SAME CENTER?)) AND HEIGHT USED
+    
+def alpha_vs_timeofday(month = None):
+    if month is not None:
+        dfm = df10[df10['time'].dt.month == month].copy()
+        month = 'Month ' + str(month)
+    else: 
+        dfm = df10.copy() # if no month is specified use full dataset
+        month = 'All Data'
+    dfm['secondsintoday'] = (dfm['time'].dt.hour * 60 + dfm['time'].dt.minute) * 60 + dfm['time'].dt.second 
+    uniquetimes = dfm['secondsintoday'].unique()
+    means = [dfm[dfm['secondsintoday'] == time]['alpha'].mean() for time in uniquetimes]
+    stds = [dfm[dfm['secondsintoday'] == time]['alpha'].std() for time in uniquetimes]
+    plt.title(f'WSE vs Time of Day ({month})')
+    plt.errorbar(uniquetimes, means, yerr = stds, fmt = 'o', markersize=3, capsize=3, elinewidth=0.5)
+    plt.xlabel('Time of day (seconds past midnight UTC)')
+    plt.ylabel(r'$\alpha$')
+    plt.tight_layout()
+    plt.show()
+
+def alpha_vs_timeofday_with_terrain(month = None, height = 10, errorbars = False):
+    if month is not None:
+        dfm = df10[df10['time'].dt.month == month].copy()
+        month = 'Month ' + str(month)
+    else:
+        dfm = df10.copy() # if no month is specified use full dataset
+        month = 'All Data'
+    dfm['secondsintoday'] = (dfm['time'].dt.hour * 60 + dfm['time'].dt.minute) * 60 + dfm['time'].dt.second 
+    for tc in terrain_classes:
+        dft = dfm[dfm[f'wd_{int(height)}m'].apply(hf.terrain_class) == tc]
+        uniquetimes = dft['secondsintoday'].unique()
+        means = [dft[dft['secondsintoday'] == time]['alpha'].mean() for time in uniquetimes]
+        if errorbars:
+            stds = [dft[dft['secondsintoday'] == time]['alpha'].std() for time in uniquetimes]
+            plt.errorbar(uniquetimes, means, yerr = stds, fmt = 'o', markersize=3, capsize=3, elinewidth=0.5, label = tc.title())
+        else:
+            plt.scatter(uniquetimes, means, s=4, label = tc.title())
+    plt.legend()
+    plt.xlabel('Time of day (seconds past midnight UTC)')
+    plt.ylabel(r'$\alpha$')
+    plt.title(f'Mean WSE vs Time of Day, by Terrain (based on {int(height)}m directions)')
+    plt.tight_layout()
+    plt.show()
+
+def alpha_vs_timeofday_with_seasons(terrain = None, height = 10):
+    if terrain in terrain_classes:
+        dfT = df10[df10[f'wd_{int(height)}m'].apply(hf.terrain_class) == terrain].copy()
+        tcstring = terrain.title() + f' based on {height}m'
+    else:
+        dfT = df10.copy()
+        tcstring =  'All Data'
+    for S, mons in seasons.items():
+        monnums = [months.index(m)+1 for m in mons]
+        dfS = dfT[dfT['time'].dt.month.isin(monnums)].copy()
+        dfS['secondsintoday'] = (dfS['time'].dt.hour * 60 + dfS['time'].dt.minute) * 60 + dfS['time'].dt.second 
+        uniquetimes = np.sort(dfS['secondsintoday'].unique())
+        means = [dfS[dfS['secondsintoday'] == time]['alpha'].mean() for time in uniquetimes]
+        plt.plot(uniquetimes, means, linewidth=1, label = S, color = seasonal_colors[S])
+    plt.legend()
+    plt.xlabel('Time of day (seconds past midnight UTC)')
+    plt.ylabel(r'$\alpha$')
+    plt.title(f'Mean WSE vs Time of Day, by Season ({tcstring})')
+    plt.tight_layout()
+    plt.show()
+
+def temperature_vs_timeofday_with_seasons(height = 10):
+    for S, mons in seasons.items():
+        monnums = [months.index(m)+1 for m in mons]
+        dfS = df10[df10['time'].dt.month.isin(monnums)].copy()
+        dfS['secondsintoday'] = (dfS['time'].dt.hour * 60 + dfS['time'].dt.minute) * 60 + dfS['time'].dt.second 
+        uniquetimes = np.sort(dfS['secondsintoday'].unique())
+        means = [dfS[dfS['secondsintoday'] == time][f't_{int(height)}m'].mean() for time in uniquetimes]
+        plt.plot(uniquetimes, means, linewidth=1, label = S, color = seasonal_colors[S])
+    plt.legend()
+    plt.xlabel('Time of day (seconds past midnight UTC)')
+    plt.ylabel('Temperature (K)')
+    plt.title(f'Mean Temperature ({int(height)}m) vs Time of Day, by Season')
+    plt.tight_layout()
+    plt.show()
+
+def combine_alpha_temperature_seasonality_plots(height = 10):
+    for S, mons in seasons.items():
+        monnums = [months.index(m)+1 for m in mons]
+        dfS = df10#[df10['time'].dt.month.isin(monnums)].copy()
+        dfS['secondsintoday'] = (dfS['time'].dt.hour * 60 + dfS['time'].dt.minute) * 60 + dfS['time'].dt.second 
+        uniquetimes = np.sort(dfS['secondsintoday'].unique())
+        meanalphas = [dfS[dfS['secondsintoday'] == time]['alpha'].mean() for time in uniquetimes]
+        meanTs = [dfS[dfS['secondsintoday'] == time][f't_{int(height)}m'].mean() for time in uniquetimes]
+        normalized_Ts = (meanTs - np.min(meanTs))/(2*(np.max(meanTs) - np.min(meanTs)))
+        plt.plot(uniquetimes, meanalphas, linewidth=1, linestyle = 'solid', label = S + r' $\alpha$', color = seasonal_colors[S])
+        plt.plot(uniquetimes, normalized_Ts, linewidth=1, linestyle = 'dashed', label = S + ' normalized temperature', color = seasonal_colors[S])
+    plt.legend()
+    plt.xlabel('Time of day (seconds past midnight UTC)')
+    plt.title(f'Mean WSE vs Time of Day, by Season, with (normalized) temperature ({int(height)}m)')
+    plt.tight_layout()
+    plt.show()
+
+def alpha_vs_sun_altitude():
+    #sun_altitudes = df10['time'].apply(lambda t : get_position(t, CRLATITUDE, CRLONGITUDE)['altitude'])
+    calculator = SunPositionCalculator()
+    sun_altitudes = np.rad2deg(df10['time'].apply(lambda t : calculator.pos(t.timestamp()*1000, CRLATITUDE, CRLONGITUDE).altitude))
+    # plt.scatter(df10['time'],sun_altitudes)
+    plt.scatter(sun_altitudes, df10['alpha'], s=0.1)
+    plt.ylim(-0.1,1.0)
+    plt.show()
+
+def consider_stratification(cutoffs = [-0.1,0.1], labels = ['unstable','neutral','stable']):
+    N = len(labels)
+    if N != len(cutoffs) + 1:
+        print('Mismatched label/cutoff list lengths')
+        return
+    
+    print(f'Scheme: {cutoffs}')
+
+    total = len(df10)
+    for i in range(N):
+        datahere = df10.copy()
+        if i < N-1:
+            datahere = datahere[datahere['ri'] < cutoffs[i]]
+        if i > 0:
+            datahere = datahere[datahere['ri'] >= cutoffs[i-1]]
+        amount = len(datahere)
+        print(f'{labels[i]}: {amount} ({(100 * amount/total):.1f}%)')
+
+def stats_ri(restriction = [5.]):
+    print('OVERALL BULK RICHARDSON NUMBER STATISTICS')
+    print(f'Median Ri: {np.median(df10.ri):.3f}')
+    print(f'Mean Ri: {np.mean(df10.ri):.3f}')
+    print(f'Std Ri: {np.std(df10.ri):.3f}')
+    for r in restriction:
+        dfR = df10[abs(df10.ri) < r]
+        print(f'RESTRICTED (|Ri| < {r}) BULK RICHARDSON NUMBER STATISTICS')
+        print(f'Restricted dataset contains {(100*len(dfR)/len(df10)):.1f}% of original data')
+        print(f'Median Ri: {np.median(dfR.ri):.3f}')
+        print(f'Mean Ri: {np.mean(dfR.ri):.3f}')
+        print(f'Std Ri: {np.std(dfR.ri):.3f}')
+
+def total_data_available():
+    N = len(heights)
+    plt.scatter(df10['time'], df10['availability'])
     plt.show()
     return
 
-def scatter_rat():
-    # Plot of vpt_lapse_env over time
-    plt.scatter(df10['time'], df10['vpt_lapse_env'],s=0.2)
-    plt.xlabel('time')
-    plt.ylabel(r'$\Delta \theta_{v}/\Delta z$, K/m')
-    plt.show()
-    return
-
-def plot_temp(height=6):
-    # plot of temperature at 6m over time
-    plt.scatter(df10['time'], df10[f't_{height}m'],s=1)
+def boom_data_available():
+    alltimes = pd.date_range(df10['time'].min(), df10['time'].max(), freq='10min').to_series()
+    for i, height in enumerate(heights):
+        availableData = df10.apply(lambda row : height * int(not pd.isna(row[f'ws_{height}m'])), axis = 1)
+        unavailableData = availableData.apply(lambda row : height - row)
+        availableData[availableData == 0] = np.nan
+        unavailableData[unavailableData == 0] = np.nan
+        if i == 0:
+            plt.scatter(df10['time'], availableData, s=4, c='blue', label = 'available')
+            plt.scatter(df10['time'], unavailableData, s=4, c='red', label = 'unavailable')
+        else:
+            plt.scatter(df10['time'], availableData, s=4, c='blue')
+            plt.scatter(df10['time'], unavailableData, s=4, c='red')
+    fullgaps = alltimes.apply(lambda row : int(row not in np.array(df10['time']).astype('datetime64[ns]')))
+    fullgaps[fullgaps == 0] = np.nan
+    plt.scatter(alltimes, fullgaps, s=4, c='green', label = 'nowhere available')
+    plt.title('Data availability/gaps')
+    plt.xlabel('Time')
+    plt.ylabel('Boom height (m)')
+    plt.legend()
     plt.show()
     return
 
@@ -160,26 +596,19 @@ def alpha_vs_temperature(month = None):
     plt.show()
     return
 
-def scatter3():
-    fig = plt.figure()
-    ax = fig.add_subplot(projection='3d')
-    ax.scatter(df10['ri'],df10['vpt_lapse_env'],df10['alpha'])
-    ax.set_xlabel('Ri')
-    ax.set_xlim([-35,25])
-    ax.set_ylabel(r'$\Delta \theta_{v}/\Delta z$')
-    ax.set_zlabel(r'$\alpha$')
-    ax.set_zlim([-0.3,1.25])
+def plot_speeds():
+    for height in heights:
+        plt.scatter(df10['time'],df10[f'ws_{height}m'], label = str(height), s=1)
+    plt.legend()
     plt.show()
     return
 
-def stratified_speeds():
-    fig, ax = plt.subplots()
-    groups = df10.groupby('stability')
-    for name, group in groups:
-        ax.scatter(group['time'],group['ws_106m'],label=name,s=1)
-    ax.legend()
-    plt.show()
-    return
+def stratandri():
+    consider_stratification()
+    consider_stratification(cutoffs=[-0.02,0.02])
+    consider_stratification(cutoffs=[-0.17,0.02])
+    consider_stratification(cutoffs=[-1,1])
+    stats_ri([1,2,5,10])
 
 def hist_ri(cutoff = 10, bins = 100):
     plt.title('Histogram of Bulk Ri Distribution')
@@ -202,126 +631,34 @@ def hist_alpha_by_stability(combine = False, title = True):
     plt.show()
     return
 
-PLOTNAMES = {
-    "autocorr" : ("autocorrs.png", "aligned_autocorrs.png"),
-    "data" : ("data.png", "aligned_data.png"),
-    "fluxes" : ("fluxes.png", "fluxes.png")
-}
-
-SONIC_DIRECTORY = "../outputs/sonic_sample"
-
-def display_sonic_plots(plotname, aligned = True):
-
-    if plotname in PLOTNAMES.keys():
-        plotname = PLOTNAMES[plotname][int(aligned)]
-
-    subdirs = []
-    for entry in os.listdir(SONIC_DIRECTORY):
-        fullpath = os.path.join(SONIC_DIRECTORY,entry)
-        if os.path.isdir(fullpath):
-            subdirs.append(fullpath)
-    
-    for sub in subdirs:
-        imagepath = os.path.join(sub, plotname)
-        try:
-            img = mpimg.imread(imagepath)
-            plt.imshow(img)
-            plt.show()
-        except:
-            print(f"Failed to find/display image from file {imagepath}")
-
-def consider_stratification(cutoffs = [-0.1,0.1], labels = ['unstable','neutral','stable']):
-    N = len(labels)
-    if N != len(cutoffs) + 1:
-        print('Mismatched label/cutoff list lengths')
-        return
-    
-    print(f'Scheme: {cutoffs}')
-
-    total = len(df10)
-    for i in range(N):
-        datahere = df10.copy()
-        if i < N-1:
-            datahere = datahere[datahere['ri'] < cutoffs[i]]
-        if i > 0:
-            datahere = datahere[datahere['ri'] >= cutoffs[i-1]]
-        amount = len(datahere)
-        print(f'{labels[i]}: {amount} ({(100 * amount/total):.1f}%)')
-
-def stats_ri(restriction = [5.]):
-    print('OVERALL BULK RICHARDSON NUMBER STATISTICS')
-    print(f'Median Ri: {np.median(df10.ri):.3f}')
-    print(f'Mean Ri: {np.mean(df10.ri):.3f}')
-    print(f'Std Ri: {np.std(df10.ri):.3f}')
-    for r in restriction:
-        dfR = df10[abs(df10.ri) < r]
-        print(f'RESTRICTED (|Ri| < {r}) BULK RICHARDSON NUMBER STATISTICS')
-        print(f'Restricted dataset contains {(100*len(dfR)/len(df10)):.1f}% of original data')
-        print(f'Median Ri: {np.median(dfR.ri):.3f}')
-        print(f'Mean Ri: {np.mean(dfR.ri):.3f}')
-        print(f'Std Ri: {np.std(dfR.ri):.3f}')
-
-def total_data_available():
-    N = len(heights)
-    plt.scatter(df10['time'], df10['availability'])
-    plt.show()
-    return
-
-def boom_data_available():
-    alltimes = pd.date_range(df10['time'].min(), df10['time'].max(), freq='10min').to_series()
-    for i, height in enumerate(heights):
-        availableData = df10.apply(lambda row : height * int(not pd.isna(row[f'ws_{height}m'])), axis = 1)
-        unavailableData = availableData.apply(lambda row : height - row)
-        availableData[availableData == 0] = np.nan
-        unavailableData[unavailableData == 0] = np.nan
-        if i == 0:
-            plt.scatter(df10['time'], availableData, s=4, c='blue', label = 'available')
-            plt.scatter(df10['time'], unavailableData, s=4, c='red', label = 'unavailable')
-        else:
-            plt.scatter(df10['time'], availableData, s=4, c='blue')
-            plt.scatter(df10['time'], unavailableData, s=4, c='red')
-    fullgaps = alltimes.apply(lambda row : int(row not in np.array(df10['time']).astype('datetime64[ns]')))
-    fullgaps[fullgaps == 0] = np.nan
-    #print(fullgaps[fullgaps == 1])
-    plt.scatter(alltimes, fullgaps, s=4, c='green', label = 'nowhere available')
-    plt.title('Data availability/gaps')
-    plt.xlabel('Time')
-    plt.ylabel('Boom height (m)')
-    plt.legend()
-    plt.show()
-    return
-
-def plot_speeds():
-    for height in heights:
-        plt.scatter(df10['time'],df10[f'ws_{height}m'], label = str(height), s=1)
-    plt.legend()
-    plt.show()
-    return
-
-def stratandri():
-    consider_stratification()
-    consider_stratification(cutoffs=[-0.02,0.02])
-    consider_stratification(cutoffs=[-0.17,0.02])
-    consider_stratification(cutoffs=[-1,1])
-    stats_ri([1,2,5,10])
-
 if __name__ == '__main__':
-    #stratified_speeds()
-    #alpha_vs_lapse()
-    #alpha_vs_ri()
-    #scatter3()
-    #bar_directions()
-    #bar_stability()
-    #stratandri()
-    #hist_ri(cutoff=0.25,bins=50)
-    #hist_alpha_by_stability(combine = True, title = False)
-    #display_sonic_plots("data")
-    #display_sonic_plots("autocorr")
-    #display_sonic_plots("fluxes")
-    #plot_speeds()
-    #total_data_available()
-    #boom_data_available()
-    #plot_alpha(temp=10,avail=True,speed=[6,10,20,32,106],title=False)
-    plot_alpha(tcolor=True)
-    #alpha_vs_timeofday()
-    #df1 = pd.read_csv('../../outputs/slow/combined.csv')
+    # alpha_vs_lapse()
+    # alpha_vs_ri()
+
+    # total_data_available()
+    # boom_data_available()
+
+    # for h in [6, 10, 20]:
+    #     stability_plots(stability = default_stability, height = h)
+    # stability_plots(stability = five_stability)
+    # alpha_vs_timeofday()
+
+    # hist_ri(cutoff=0.25,bins=50)
+    # hist_alpha_by_stability(combine = True, title = False)
+
+    # alpha_vs_timeofday_with_terrain(height = 10)
+    # alpha_vs_timeofday_with_terrain(height = 6)
+    # temperature_vs_timeofday_with_seasons()
+    # combine_alpha_temperature_seasonality_plots()
+    # alpha_vs_sun_altitude()
+
+    # alpha_vs_timeofday_with_seasons()
+    # alpha_vs_timeofday_with_seasons(terrain = 'open')
+    # alpha_vs_timeofday_with_seasons(terrain = 'complex')
+
+    # plot_alpha(temp=10,avail=True,speed=[6,10,20,32,106],title=False)
+    # plot_alpha(tcolor=True)
+
+    # print_terrain_monthly()
+    # plot_terrain_monthly(other = False, proportions=True) # Do something like these with stability?
+    # plot_terrain_monthly(other = True, proportions=False)
