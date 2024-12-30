@@ -1,4 +1,4 @@
-import roses
+import windprofile_characterization.src.old_rose.customroses as customroses
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.animation as anim
@@ -34,7 +34,7 @@ def animate():
         data_date = winddata[winddata['time'].dt.date == date.date()]
         if len(data_date) < 10:
             continue
-        artist = roses.windrose(fig, data_date)
+        artist = customroses.windrose(fig, data_date)
         artist.set_title(date.date())
         artists.append([artist])
     wr_anim = anim.ArtistAnimation(fig = fig, artists = artists, interval = 200)
@@ -46,7 +46,7 @@ def animate():
 
 def plot():
     fig = plt.figure()
-    rose = roses.windrose(fig, winddata)
+    rose = customroses.windrose(fig, winddata)
     plt.show()
 
 if __name__ == '__main__':
