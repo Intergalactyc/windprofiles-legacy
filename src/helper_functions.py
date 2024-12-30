@@ -165,6 +165,13 @@ def stability_class(Ri):
         return 'stable'
     return 'strongly stable'
 
+def stability_class_3(Ri):
+    if Ri < -0.1:
+        return 'unstable'
+    if -0.1 <= Ri < 0.1:
+        return 'neutral'
+    return 'stable'
+
 def new_class(rat):
     if rat < -0.004:
         return 'unstable'

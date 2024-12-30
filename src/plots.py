@@ -1,11 +1,13 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
+import matplotlib.patches as mpatches
 from matplotlib import cm
 import numpy as np
 import helper_functions as hf
 import os
 from sun_position_calculator import SunPositionCalculator
+import scipy.stats as stats
 
 # Load data
 df10 = pd.read_csv('../../outputs/slow/ten_minutes_labeled.csv') # 10-minute averaged data, with calculations and labeling performed by reduce.py
@@ -190,32 +192,6 @@ def plot_fits_summary(data,
     # second plot
     #plt.scatter()
 
-# def terrain_breakdown(
-#         height = 10,
-#         radius = 15
-# ):
-#     result = pd.DataFrame(index = months, columns = [tc.title() for tc in terrain_classes + ['other']])
-#     for num, month in enumerate(months, 1):
-#         df_mon = data[data['time'].dt.month==num]
-#         for sc in stability_classes:
-#             dfMsc = df_mon[df_mon[stability_parameter].apply(stability_scheme) == sc]
-#             means = dfMsc[[f'ws_{h}m' for h in heights]].mean(axis = 0)
-#             _, wsc = hf.power_fit(heights, means.values, both=True)
-#             result.loc[month, sc.title()] = wsc
-#     return result
-    
-# def plot_terrain_summary(
-#         height = 10,
-#         radius = 15
-# ):
-#     result = terrain_breakdown(height=height, radius=radius)
-
-#     plot_fits_summary(data=result,
-#                       minmax)
-#     fig, ax = plt.subplots(figsize = (10,6))
-#     for tc in terrain_classes + ['other']:
-#         df = df10[df10[f'wd_{int(height)}m'].apply(lambda dir : hf.terrain_class(dir, radius = radius)) == tc]
-
 def terrain_breakdown_monthly(
         data = df10,
         height = 10,
@@ -332,11 +308,12 @@ def fits_process_all(
     deviation = results_by_tc['complex'] - results_by_tc['open']
     greater = results_by_tc['complex'].combine(results_by_tc['open'], np.maximum)
     percent = 100 * deviation / greater
-    plot_fits_summary(data = deviation, cmap = cmap, pretitle = f'COMPLEX - OPEN DISCREPANCIES (based on {int(height)}m directions)', saveto = directory + f'{int(height)}m/' + f'discrepancy_{int(height)}m' if saveplots else None, minmax = (-0.2,0.2), percent = percent)
-
-def terrain_by_month(height = 10,
-                     cmap = 'viridis'):
-    pass
+    plot_fits_summary(data = deviation,
+                      cmap = cmap,
+                      pretitle = f'COMPLEX - OPEN DISCREPANCIES (based on {int(height)}m directions)',
+                      saveto = directory + f'{int(height)}m/' + f'discrepancy_{int(height)}m' if saveplots else None,
+                      minmax = (-0.2,0.2),
+                      percent = percent)
 
 def stability_plots(height = 10, stability = default_stability, cmap = 'viridis'):
     #mean_wind_profiles_by_stability_only(stability = stability)
@@ -352,32 +329,36 @@ def stability_plots(height = 10, stability = default_stability, cmap = 'viridis'
         # ALSO FOR FITS_PROCESS_ALL MAYBE PLOT THE DIFFERENCES COMPLEX - OPEN
             # + OPEN QUESTION OF SENSITIVITY TO TERRAIN WINDOW WIDTH (EXTEND TO 45 OR 60 DEGREES (SAME CENTER?)) AND HEIGHT USED
     
-def alpha_vs_timeofday(month = None):
+def alpha_vs_timeofday(month = None, local = True):
+    timing = 'local_time' if local else 'time'
+    timezone = 'local' if local else 'UTC'
     if month is not None:
-        dfm = df10[df10['time'].dt.month == month].copy()
+        dfm = df10[df10[timing].dt.month == month].copy()
         month = 'Month ' + str(month)
     else: 
         dfm = df10.copy() # if no month is specified use full dataset
         month = 'All Data'
-    dfm['secondsintoday'] = (dfm['time'].dt.hour * 60 + dfm['time'].dt.minute) * 60 + dfm['time'].dt.second 
+    dfm['secondsintoday'] = (dfm[timing].dt.hour * 60 + dfm[timing].dt.minute) * 60 + dfm[timing].dt.second 
     uniquetimes = dfm['secondsintoday'].unique()
     means = [dfm[dfm['secondsintoday'] == time]['alpha'].mean() for time in uniquetimes]
     stds = [dfm[dfm['secondsintoday'] == time]['alpha'].std() for time in uniquetimes]
     plt.title(f'WSE vs Time of Day ({month})')
     plt.errorbar(uniquetimes, means, yerr = stds, fmt = 'o', markersize=3, capsize=3, elinewidth=0.5)
-    plt.xlabel('Time of day (seconds past midnight UTC)')
+    plt.xlabel(f'Time of day (seconds past midnight {timezone})')
     plt.ylabel(r'$\alpha$')
     plt.tight_layout()
     plt.show()
 
-def alpha_vs_timeofday_with_terrain(month = None, height = 10, errorbars = False):
+def alpha_vs_timeofday_with_terrain(month = None, height = 10, errorbars = False, local = True):
+    timing = 'local_time' if local else 'time'
+    timezone = 'local' if local else 'UTC'
     if month is not None:
-        dfm = df10[df10['time'].dt.month == month].copy()
+        dfm = df10[df10[timing].dt.month == month].copy()
         month = 'Month ' + str(month)
     else:
         dfm = df10.copy() # if no month is specified use full dataset
         month = 'All Data'
-    dfm['secondsintoday'] = (dfm['time'].dt.hour * 60 + dfm['time'].dt.minute) * 60 + dfm['time'].dt.second 
+    dfm['secondsintoday'] = (dfm[timing].dt.hour * 60 + dfm[timing].dt.minute) * 60 + dfm[timing].dt.second 
     for tc in terrain_classes:
         dft = dfm[dfm[f'wd_{int(height)}m'].apply(hf.terrain_class) == tc]
         uniquetimes = dft['secondsintoday'].unique()
@@ -388,13 +369,15 @@ def alpha_vs_timeofday_with_terrain(month = None, height = 10, errorbars = False
         else:
             plt.scatter(uniquetimes, means, s=4, label = tc.title())
     plt.legend()
-    plt.xlabel('Time of day (seconds past midnight UTC)')
+    plt.xlabel(f'Time of day (seconds past midnight {timezone})')
     plt.ylabel(r'$\alpha$')
     plt.title(f'Mean WSE vs Time of Day, by Terrain (based on {int(height)}m directions)')
     plt.tight_layout()
     plt.show()
 
-def alpha_vs_timeofday_with_seasons(terrain = None, height = 10):
+def alpha_vs_timeofday_with_seasons(terrain = None, height = 10, local = True):
+    timing = 'local_time' if local else 'time'
+    timezone = 'local' if local else 'UTC'
     if terrain in terrain_classes:
         dfT = df10[df10[f'wd_{int(height)}m'].apply(hf.terrain_class) == terrain].copy()
         tcstring = terrain.title() + f' based on {height}m'
@@ -403,38 +386,142 @@ def alpha_vs_timeofday_with_seasons(terrain = None, height = 10):
         tcstring =  'All Data'
     for S, mons in seasons.items():
         monnums = [months.index(m)+1 for m in mons]
-        dfS = dfT[dfT['time'].dt.month.isin(monnums)].copy()
-        dfS['secondsintoday'] = (dfS['time'].dt.hour * 60 + dfS['time'].dt.minute) * 60 + dfS['time'].dt.second 
+        dfS = dfT[dfT[timing].dt.month.isin(monnums)].copy()
+        dfS['secondsintoday'] = (dfS[timing].dt.hour * 60 + dfS[timing].dt.minute) * 60 + dfS[timing].dt.second 
         uniquetimes = np.sort(dfS['secondsintoday'].unique())
         means = [dfS[dfS['secondsintoday'] == time]['alpha'].mean() for time in uniquetimes]
         plt.plot(uniquetimes, means, linewidth=1, label = S, color = seasonal_colors[S])
     plt.legend()
-    plt.xlabel('Time of day (seconds past midnight UTC)')
+    plt.xlabel(f'Time of day (seconds past midnight {timezone})')
     plt.ylabel(r'$\alpha$')
     plt.title(f'Mean WSE vs Time of Day, by Season ({tcstring})')
     plt.tight_layout()
     plt.show()
 
-def temperature_vs_timeofday_with_seasons(height = 10):
+def alpha_tod_violins(season = None, height = 10, local = True, wrap0 = True): 
+
+    timing = 'local_time' if local else 'time'
+    timezone = 'local' if local else 'UTC'    
+    
+    if season is None:
+        dfS = df10
+        s_text = 'full year'
+    else:
+        mons = seasons[season.title()]
+        monnums = [months.index(m)+1 for m in mons]
+        dfS = df10[df10[timing].dt.month.isin(monnums)].copy()
+        s_text = season
+
+    dataset = [dfS[dfS[timing].dt.hour == hr]['alpha'].reset_index(drop=True) for hr in range(24)]
+    if wrap0: dataset.append(df10[df10[timing].dt.hour == 0]['alpha'].reset_index(drop=True))
+    means = [dat.mean() for dat in dataset]
+    medians = [dat.median() for dat in dataset]
+
+    plt.violinplot(dataset,
+                   positions = range(25) if wrap0 else range(24),
+                   showextrema = False,
+                   showmedians = True,
+                   widths = 0.8,
+                   points = 200,
+                   )
+    
+    major_tick_locations = range(0,25,6) if wrap0 else range(0,24,6)
+    major_tick_labels = [6*i for i in range(4)]
+    if wrap0: major_tick_labels.append(0)
+    plt.xticks(ticks = major_tick_locations,
+               labels = major_tick_labels,
+               minor = False) # Major x ticks
+    plt.xticks(range(24), range(24), minor = True, size=7) # Minor x ticks
+    plt.xlabel(f'Hour into day ({timezone})')
+
+    plt.ylim(-0.4,1.2)
+    plt.ylabel(r'$\alpha$')
+
+    plt.title(f'WSE Median and Distribution by Time of Day ({s_text})')
+
+    plt.tight_layout()
+    plt.show()
+# add sinusoidal fit based on medians??
+# box plot overlay?
+
+def alpha_tod_violins_by_terrain(season = None, height = 10, local = True, wrap0 = True):  
+    # need to modify to add seasonality - currently basically identical to above
+    
+    timing = 'local_time' if local else 'time'
+    timezone = 'local' if local else 'UTC'
+
+    if season is None:
+        dfS = df10
+        s_text = 'full year'
+    else:
+        mons = seasons[season.title()]
+        monnums = [months.index(m)+1 for m in mons]
+        dfS = df10[df10[timing].dt.month.isin(monnums)].copy()
+        s_text = season
+    
+    colors = {'open' : '#ff7f0e', 'complex' : '#1f77b4'}
+    for tc in ['open', 'complex']:
+        dfT = dfS[dfS[f'wd_{int(height)}m'].apply(hf.terrain_class) == tc]
+        dataset = [dfT[dfT[timing].dt.hour == hr]['alpha'].reset_index(drop=True) for hr in range(24)]
+        if wrap0: dataset.append(dfT[dfT[timing].dt.hour == 0]['alpha'].reset_index(drop=True))
+        parts = plt.violinplot(dataset,
+                       positions = range(25) if wrap0 else range(24),
+                       showextrema = False,
+                       showmedians = True,
+                       widths = 0.8,
+                       points = 200,
+                       )
+        for pc in parts['bodies']:
+            pc.set_facecolor(colors[tc])
+            pc.set_alpha(0.2)
+        parts['cmedians'].set_edgecolor(colors[tc])
+    
+    major_tick_locations = range(0,25,6) if wrap0 else range(0,24,6)
+    major_tick_labels = [6*i for i in range(4)]
+    if wrap0: major_tick_labels.append(0)
+    plt.xticks(ticks = major_tick_locations,
+               labels = major_tick_labels,
+               minor = False) # Major x ticks
+    plt.xticks(range(24), range(24), minor = True, size=7) # Minor x ticks
+    plt.xlabel(f'Hour into day ({timezone})')
+
+    plt.ylim(-0.4,1.2)
+    plt.ylabel(r'$\alpha$')
+
+    plt.title(f'WSE Median and Distribution by Time of Day ({s_text})')
+
+    labels = [(mpatches.Patch(color=color), tc) for tc, color in colors.items()]
+    plt.legend(*zip(*labels), loc=2)
+
+    plt.tight_layout()
+    plt.show()
+
+def temperature_vs_timeofday_with_seasons(height = 10, local = True):
+    timing = 'local_time' if local else 'time'
+    timezone = 'local' if local else 'UTC'    
+    
     for S, mons in seasons.items():
         monnums = [months.index(m)+1 for m in mons]
-        dfS = df10[df10['time'].dt.month.isin(monnums)].copy()
-        dfS['secondsintoday'] = (dfS['time'].dt.hour * 60 + dfS['time'].dt.minute) * 60 + dfS['time'].dt.second 
+        dfS = df10[df10[timing].dt.month.isin(monnums)].copy()
+        dfS['secondsintoday'] = (dfS[timing].dt.hour * 60 + dfS[timing].dt.minute) * 60 + dfS[timing].dt.second 
         uniquetimes = np.sort(dfS['secondsintoday'].unique())
         means = [dfS[dfS['secondsintoday'] == time][f't_{int(height)}m'].mean() for time in uniquetimes]
         plt.plot(uniquetimes, means, linewidth=1, label = S, color = seasonal_colors[S])
     plt.legend()
-    plt.xlabel('Time of day (seconds past midnight UTC)')
+    plt.xlabel(f'Time of day (seconds past midnight {timezone})')
     plt.ylabel('Temperature (K)')
     plt.title(f'Mean Temperature ({int(height)}m) vs Time of Day, by Season')
     plt.tight_layout()
     plt.show()
 
-def combine_alpha_temperature_seasonality_plots(height = 10):
+def combine_alpha_temperature_seasonality_plots(height = 10, local = True):
+    timing = 'local_time' if local else 'time'
+    timezone = 'local' if local else 'UTC'    
+    
     for S, mons in seasons.items():
         monnums = [months.index(m)+1 for m in mons]
-        dfS = df10#[df10['time'].dt.month.isin(monnums)].copy()
-        dfS['secondsintoday'] = (dfS['time'].dt.hour * 60 + dfS['time'].dt.minute) * 60 + dfS['time'].dt.second 
+        dfS = df10#[df10[timing].dt.month.isin(monnums)].copy()
+        dfS['secondsintoday'] = (dfS[timing].dt.hour * 60 + dfS[timing].dt.minute) * 60 + dfS[timing].dt.second 
         uniquetimes = np.sort(dfS['secondsintoday'].unique())
         meanalphas = [dfS[dfS['secondsintoday'] == time]['alpha'].mean() for time in uniquetimes]
         meanTs = [dfS[dfS['secondsintoday'] == time][f't_{int(height)}m'].mean() for time in uniquetimes]
@@ -442,7 +529,7 @@ def combine_alpha_temperature_seasonality_plots(height = 10):
         plt.plot(uniquetimes, meanalphas, linewidth=1, linestyle = 'solid', label = S + r' $\alpha$', color = seasonal_colors[S])
         plt.plot(uniquetimes, normalized_Ts, linewidth=1, linestyle = 'dashed', label = S + ' normalized temperature', color = seasonal_colors[S])
     plt.legend()
-    plt.xlabel('Time of day (seconds past midnight UTC)')
+    plt.xlabel(f'Time of day (seconds past midnight {timing})')
     plt.title(f'Mean WSE vs Time of Day, by Season, with (normalized) temperature ({int(height)}m)')
     plt.tight_layout()
     plt.show()
@@ -618,16 +705,67 @@ def hist_ri(cutoff = 10, bins = 100):
     plt.show()
     return()
 
-def hist_alpha_by_stability(combine = False, title = True):
-    fig, ax = plt.subplots(figsize = (5.5,4))
-    if title: fig.suptitle(r'$\alpha$ distribution by stability')
-    ax.set_xlabel(r'$\alpha$')
-    ax.set_ylabel('Probability Density')
-    scs = combined_stability_classes if combine else stability_classes
-    for sc in scs:
-        df_restricted = df10[df10['stability'].isin(sc)]
-        ax.hist(df_restricted['alpha'], bins=50, density = True, range = (-0.4, 1.25), alpha=0.5, edgecolor = 'k', label=sc[0].capitalize())
-    ax.legend()
+def hist_alpha_by_stability(classifier = hf.stability_class_3, variable = 'ri', separate = False, compute = True, overlay = True):
+    dfc = df10.copy().drop(columns = ['stability'])
+    dfc['stability'] = dfc.apply(lambda row : classifier(row[variable]), axis = 1)
+    uniques = list(dfc['stability'].unique())
+
+    titleextra = ''
+    if separate:
+        if len(uniques) % 2 != 0:
+            uniques.append(None)
+
+        fig, axs = plt.subplots(nrows = 2, ncols = len(uniques) // 2)
+
+        for sc, ax in zip(uniques, axs.reshape(-1)):
+            if sc is None:
+                ax.set_visible(False)
+                continue
+            df_restricted = dfc[dfc['stability'] == sc]
+            label = sc.title()
+            if compute or overlay:
+                mean = df_restricted['alpha'].mean()
+                std = df_restricted['alpha'].std()
+            if compute:
+                label += f': {mean:.2f}±{std:.2f}'
+            ax.set_xlabel(r'$\alpha$')
+            ax.set_ylabel('Probability Density')
+            ax.hist(df_restricted['alpha'],
+                    bins = 50,
+                    density = True,
+                    range = (-0.4, 1.25),
+                    alpha = 0.75,
+                    edgecolor = 'k',
+                    )     
+            if overlay:
+                x = np.linspace(-0.4, 1.25, 100)
+                ax.plot(x, stats.norm.pdf(x, mean, std))
+                titleextra = '\nNormal distributions overlaid'
+            label += f'\nN = {len(df_restricted)}'
+            ax.set_title(label)
+
+    else:
+        fig, ax = plt.subplots()
+        for i, sc in enumerate(uniques):
+            df_restricted = dfc[dfc['stability'] == sc]
+            label = sc.title()
+            if compute:
+                mean = df_restricted['alpha'].mean()
+                std = df_restricted['alpha'].std()
+                label += f': {mean:.2f}±{std:.2f}'
+            ax.hist(df_restricted['alpha'],
+                    bins = 50,
+                    density = True,
+                    range = (-0.4, 1.25),
+                    alpha = 0.55 - 0.05*i,
+                    edgecolor = 'k',
+                    label = label,
+                    )            
+        ax.legend()
+
+    fig.suptitle(r'$\alpha$ Distribution by Stability' + titleextra)
+
+    plt.tight_layout()
     plt.show()
     return
 
@@ -655,6 +793,18 @@ if __name__ == '__main__':
     # alpha_vs_timeofday_with_seasons()
     # alpha_vs_timeofday_with_seasons(terrain = 'open')
     # alpha_vs_timeofday_with_seasons(terrain = 'complex')
+
+    # alpha_tod_violins()
+    # alpha_tod_violins_by_terrain()
+    # for s in seasons.keys():
+    #     alpha_tod_violins(season = s)
+    #     alpha_tod_violins_by_terrain(season = s)
+
+    hist_alpha_by_stability(classifier = hf.stability_class_3, separate = False, compute = True)
+    hist_alpha_by_stability(classifier = hf.stability_class, separate = False, compute = True)
+
+    #hist_alpha_by_stability(classifier = hf.stability_class_3, separate = True, compute = True, overlay = True)
+    #hist_alpha_by_stability(classifier = hf.stability_class, separate = True, compute = True, overlay = True)
 
     # plot_alpha(temp=10,avail=True,speed=[6,10,20,32,106],title=False)
     # plot_alpha(tcolor=True)
