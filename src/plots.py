@@ -398,7 +398,7 @@ def alpha_vs_timeofday_with_seasons(terrain = None, height = 10, local = True):
     plt.tight_layout()
     plt.show()
 
-def alpha_tod_violins(season = None, height = 10, local = True, wrap0 = True): 
+def alpha_tod_violins(season = None, height = 10, local = True, wrap0 = True, fit = False): 
 
     timing = 'local_time' if local else 'time'
     timezone = 'local' if local else 'UTC'    
@@ -413,9 +413,7 @@ def alpha_tod_violins(season = None, height = 10, local = True, wrap0 = True):
         s_text = season
 
     dataset = [dfS[dfS[timing].dt.hour == hr]['alpha'].reset_index(drop=True) for hr in range(24)]
-    if wrap0: dataset.append(df10[df10[timing].dt.hour == 0]['alpha'].reset_index(drop=True))
-    means = [dat.mean() for dat in dataset]
-    medians = [dat.median() for dat in dataset]
+    if wrap0: dataset.append(df10[df10[timing].dt.hour == 0]['alpha'].reset_index(drop=True))    
 
     plt.violinplot(dataset,
                    positions = range(25) if wrap0 else range(24),
@@ -425,6 +423,15 @@ def alpha_tod_violins(season = None, height = 10, local = True, wrap0 = True):
                    points = 200,
                    )
     
+    if fit:
+        medians = [dat.median() for dat in dataset]
+        stds = [dat.std() for dat in dataset]
+        fitsine, params = hf.fit_sine(range(24), medians[:24], stds[:24], fix_period=True)
+        print(f'alpha = {params[0]:.4f} * sin({params[1]:.4f} * t + {params[2]:.4f}) + {params[3]:.4f}')
+        # NOTE: MIGHT BE NICE TO MAKE THAT A REAL PHASE SHIFT RATHER THAN NORMALIZED
+        xplot = np.linspace(0, 24, 100)
+        plt.plot(xplot, fitsine(xplot), color = 'red', linestyle = 'dashed', alpha = 0.5)
+
     major_tick_locations = range(0,25,6) if wrap0 else range(0,24,6)
     major_tick_labels = [6*i for i in range(4)]
     if wrap0: major_tick_labels.append(0)
@@ -437,12 +444,10 @@ def alpha_tod_violins(season = None, height = 10, local = True, wrap0 = True):
     plt.ylim(-0.4,1.2)
     plt.ylabel(r'$\alpha$')
 
-    plt.title(f'WSE Median and Distribution by Time of Day ({s_text})')
+    plt.title(f'WSE Medians and Distributions by Time of Day ({s_text})')
 
     plt.tight_layout()
     plt.show()
-# add sinusoidal fit based on medians??
-# box plot overlay?
 
 def alpha_tod_violins_by_terrain(season = None, height = 10, local = True, wrap0 = True):  
     # need to modify to add seasonality - currently basically identical to above
@@ -770,6 +775,8 @@ def hist_alpha_by_stability(classifier = hf.stability_class_3, variable = 'ri', 
     return
 
 if __name__ == '__main__':
+    alpha_tod_violins(fit = True)
+
     # alpha_vs_lapse()
     # alpha_vs_ri()
 
@@ -800,8 +807,8 @@ if __name__ == '__main__':
     #     alpha_tod_violins(season = s)
     #     alpha_tod_violins_by_terrain(season = s)
 
-    hist_alpha_by_stability(classifier = hf.stability_class_3, separate = False, compute = True)
-    hist_alpha_by_stability(classifier = hf.stability_class, separate = False, compute = True)
+    # hist_alpha_by_stability(classifier = hf.stability_class_3, separate = False, compute = True)
+    # hist_alpha_by_stability(classifier = hf.stability_class, separate = False, compute = True)
 
     #hist_alpha_by_stability(classifier = hf.stability_class_3, separate = True, compute = True, overlay = True)
     #hist_alpha_by_stability(classifier = hf.stability_class, separate = True, compute = True, overlay = True)

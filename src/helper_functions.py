@@ -3,6 +3,8 @@
 import numpy as np
 import pandas as pd
 import math
+from scipy.optimize import curve_fit
+import scipy.stats as stats
 
 LOCAL_GRAVITY = 9.802 # local gravity at Cedar Rapids (latitude ~ 42 degrees, elevation ~ 247 m), in m/s^2
 
@@ -155,6 +157,48 @@ def bulk_richardson_number(vpt1, vpt2, z1, z2, ws1, ws2, wd1, wd2):
     vpt_avg = (vpt1 + vpt2) / 2
     ri = g * delta_vpt * delta_z / (vpt_avg * (delta_u * delta_u + delta_v * delta_v))
     return ri
+
+def sine_function(x, A, B, C, D):
+    return A * np.sin(B * x + C) + D # A: amplitude, B: period, C: normalized phase shift, D: offset
+
+def fit_sine(x, y, yerrs, guess_period = 2*np.pi/24, guess_shift = np.pi/2, fix_period = False):
+
+    # tried making a goodness of fit chi^2 test but I don't understand enough
+    x = np.array(x)
+    y = np.array(y)
+    yerrs = np.array(yerrs)
+
+    guess_offset = np.mean(y)
+    guess_amplitude = 3 * np.std(y) / np.sqrt(2)
+
+    fitting_function = (lambda t, a, c, d : sine_function(t, a, guess_period, c, d)) if fix_period else sine_function
+    guess = [guess_amplitude, guess_shift, guess_offset] if fix_period else [guess_amplitude, guess_period, guess_shift, guess_offset]
+
+    params, pcov = curve_fit(fitting_function, x, y, sigma = yerrs, p0 = guess)
+    
+    params = [params[0], guess_period, params[1], params[2]] if fix_period else params
+    bestfit = lambda t : sine_function(t, *params)
+
+    # Dinv = np.diag(1 / np.sqrt(np.diag(pcov)))
+    # pcorr = Dinv @ pcov @ Dinv
+    # perrs = np.sqrt(np.diag(pcov))
+    # res = ((y - bestfit(x))**2)
+    # print(res)
+    # chisquared = np.sum(res/(bestfit(x)**2))
+    # dof = len(y) - 4 + int(fix_period)
+    # pval = stats.distributions.chi2.sf(chisquared, dof)
+
+    # fitinfo = {
+    #     'parameters' : params,
+    #     'covariances' : pcov,
+    #     'correlations' : pcorr,
+    #     'errors' : perrs,
+    #     'chi_squared' : chisquared,
+    #     'p' : pval,
+    #     'info' : '`parameters` is best fit parameters a, (b), c, d to a*sin(bx+c)+d'
+    # }
+
+    return bestfit, params#fitinfo
 
 def stability_class(Ri):
     if Ri < -0.1:
