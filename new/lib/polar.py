@@ -10,7 +10,7 @@ def wind_components(speed, direction, invert = False):
     #     speed.loc[speed == 0.]
     # elif math.isnan(direction) or speed == 0.:
     #     return 0., 0.
-    direction_rad = np.radians(direction)
+    direction_rad = np.deg2rad(direction)
     u = speed * np.sin(direction_rad)
     v = speed * np.cos(direction_rad)
     if invert:

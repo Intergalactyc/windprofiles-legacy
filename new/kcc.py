@@ -1,10 +1,25 @@
 import pandas as pd
 import numpy as np
-from convert import convert_dataframe_units, shadowing_merge, clean_formatting
-from lib.other import test_frame_discrepancy_by_row
+import preprocess
+import compute
 
 # Where to pull data from
 data_directory = '../../data/KCC_SlowData'
+
+# Time periods during which data is untrustworthy and should be removed
+REMOVAL_PERIODS = {
+    ('2018-03-05 13:20:00','2018-03-10 00:00:00') : 'ALL', # large maintenance gap
+    ('2018-04-18 17:40:00','2018-04-19 14:20:00') : [106], # small maintenance-shaped gap
+    ('2018-09-10 12:00:00','2018-09-20 12:00:00') : 'ALL' # blip at end
+}
+
+INSTRUCTIONS = {
+
+}
+
+# All heights (in m) that data exists at
+# Data columns will (and must) follow '{type}_{height}m' format
+HEIGHTS = [6, 10, 20, 32, 80, 106]
 
 # Read in the data from the booms and set column names to common format
 boom1 = pd.read_csv(f'{data_directory}/Boom1OneMin.csv').rename(columns={'TimeStamp' : 'time',
@@ -51,7 +66,13 @@ boom_list = [boom1,boom2,boom3,boom4,boom5,boom6,boom7]
 for boom in boom_list:
     boom['time'] = pd.to_datetime(boom['time'])
     boom.set_index('time', inplace=True)
-df = boom1.merge(boom2, on='time', how='inner').merge(boom6, on='time', how='inner').merge(boom7, on='time', how='inner').merge(boom3, on='time',how='left').merge(boom4, on='time', how='left').merge(boom5, on='time', how='left')
+df = (boom1.merge(boom2, on='time', how='inner')
+        .merge(boom6, on='time', how='inner')
+        .merge(boom7, on='time', how='inner')
+        .merge(boom3, on='time',how='left')
+        .merge(boom4, on='time', how='left')
+        .merge(boom5, on='time', how='left')
+        ) # maybe revisit and do outer only?
 
 # Units that source data is in
 original_units = {
@@ -63,31 +84,50 @@ original_units = {
 }
 
 # Automatically convert units of all columns to standards as outlined in convert.py
-df = convert_dataframe_units(df = df, from_units = original_units)
+df = preprocess.convert_dataframe_units(df = df, from_units = original_units)
 
 # Conditionally merge wind data from booms 6 and 7
 # Boom 6 (106m1, west side) is shadowed near 90 degrees (wind from east)
 # Boom 7 (106m2, east side) is shadowed near 270 degrees (wind from west)
 # Important that we do this after the conversion step, to make sure wind angles are correct
-df['ws_106m'], df['wd_106m'] = shadowing_merge(
+df['ws_106m'], df['wd_106m'] = preprocess.shadowing_merge(
     df = df,
     speeds = ['ws_106m1', 'ws_106m2'],
     directions = ['wd_106m1', 'wd_106m2'],
     angles = [90, 270],
-    width = 30 # Winds from within 30/2=15 degrees of tower are discarded
+    width = 30, # Winds from within 30/2=15 degrees of tower are discarded
     drop_old = True # Discard the 106m1 and 106m2 columns afterwards
 )
 
 # Final common formatting changes:
 # ws = 0 --> wd = pd.nan; types --> float32; sorting & duplication fixes
-df = clean_formatting(df)
+df = preprocess.clean_formatting(df = df, type = 'float32')
 
-# TEMPORARY: comparison to old results
+# Remove data according to REMOVAL_PERIODS
+df = preprocess.remove_data(df = df, periods = REMOVAL_PERIODS)
+
+# Rolling outlier removal
+df = preprocess.rolling_outlier_removal(df = df,
+                                        window_size_minutes = 30,
+                                        sigma = 5,
+                                        column_types = ['ws', 't', 'p', 'rh']) # maybe revisit and only remove wind speed outliers?
+
+# Resampling into 10 minute intervals
+df = preprocess.resample(df = df,
+                         window_size_minutes = 10,
+                         how = 'mean',
+                         all_heights = HEIGHTS)
+
+df = compute.compute_values(df = df, instructions = INSTRUCTIONS)
+
+###
+# TEMPORARY: for comparison to old results
 dfOld = pd.read_csv('../../outputs/slow/combined.csv')
 dfOld['time'] = pd.to_datetime(dfOld['time'])
 dfOld.set_index('time', inplace=True)
-dfOld = clean_formatting(dfOld)
+dfOld = preprocess.clean_formatting(dfOld, silent = True) # for consistency in comparison
 df.to_csv('../../results/combined.csv')
 dfOld.to_csv('../../results/OLD.csv')
+# from lib.other import test_frame_discrepancy_by_row
 # test_frame_discrepancy_by_row(df, dfOld, progress = True) # Used this to find the ws_106m 2x error
-
+###
