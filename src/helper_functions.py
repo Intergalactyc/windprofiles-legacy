@@ -122,9 +122,10 @@ def top_cond_avg(s1,s2,d1,d2,width=30):
     BOUNDS = [180,360] # UNcorrected angles from which there is shadowing (for boom 6 and 7 respectively)
     d1d = (d1-BOUNDS[0]) % 360
     d2d = (d2-BOUNDS[1]) % 360
-    if min(360-d1d, d1d) < hwidth: # if boom 6 is being shadowed (wind from E/90 deg, which is 180 uncorrected), ignore it
+    # the isna checks are important (could also be resolved by checking and sometimes not dividing by 2 when averaging) to avoid 106m wind speed underestimation!!!
+    if min(360-d1d, d1d) < hwidth or (pd.isna(s1) and not pd.isna(s2)): # if boom 6 is being shadowed (wind from E/90 deg, which is 180 uncorrected), ignore it
         return s2, d2
-    elif min(360-d2d, d2d) < hwidth: # if boom 7 is being shadowed (wind from W/270 deg, which is 360 uncorrected), ignore it
+    elif min(360-d2d, d2d) < hwidth or (pd.isna(s2) and not pd.isna(s1)): # if boom 7 is being shadowed (wind from W/270 deg, which is 360 uncorrected), ignore it
         return s1, d1
     else: # if neither is shadowed, vector average both
         x1, y1 = wind_components(s1, d1)

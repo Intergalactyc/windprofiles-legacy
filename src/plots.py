@@ -320,7 +320,7 @@ def stability_plots(height = 10, stability = default_stability, cmap = 'viridis'
     #mean_wind_profiles_by_terrain_and_stability(height = height, stability = stability)
     #bar_stability(stability = stability)
     fits_process_all(stability = stability, height = height, cmap = cmap)
-    terrain_by_month(height = height, cmap = cmap)
+    plot_terrain_monthly(height = height, cmap = cmap)
     # NEXT DO SOMETHING LIKE THE FITS_PROCESS_ALL THING BUT INSTEAD GIVING A BREAKDOWN OF HOW MUCH DATA IS IN EACH TERRAIN CLASS MONTHLY
         # ** TERRAIN CLASS BREAKDOWN BY MONTH **
         # RI HISTOGRAM BY MONTH?

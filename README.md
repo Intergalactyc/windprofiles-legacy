@@ -3,11 +3,7 @@ windprofile_characterization: GLWind Wind Profile Characterization
 
 Author: Elliott Walker (walker.elliott.j@gmail.com)
 
-Extension of [glwind_codebase](https://github.com/windysensors/glwind_codebase/) which will only focus on the [wind profile analysis/characterization project](https://engineering.csuohio.edu/glwind_reu/wind-profile-characterization-based-surface-terrain-and-atmospheric-thermal-stability) for the [GLWind program](https://engineering.csuohio.edu/glwind_reu/glwind_reu).
-
-This will be where I put my work for Fall 2024, especially that towards improving the poster for the November 2024 APS DFD meeting in SLC.
-
-This is kind of a mess at the moment, I need to clean stuff up.
+Extension of the old [glwind_codebase](https://github.com/windysensors/glwind_codebase/), focusing on the [wind profile analysis/characterization project](https://engineering.csuohio.edu/glwind_reu/wind-profile-characterization-based-surface-terrain-and-atmospheric-thermal-stability) for the [GLWind program](https://engineering.csuohio.edu/glwind_reu/glwind_reu). Currently being worked on at Texas Tech University as a continuation of work from Summer 2024.
 
 Required Python packages
 -----------------------
@@ -18,16 +14,19 @@ seaborn
 tqdm
 argparse
 multiprocessing
+scipy
+windrose
 
-Usage
-------
-Run the files from the `src` directory.
+Why is this a mess?
+-----------------------
+Up until now I've just been throwing stuff together to see what works and get an idea of what kind of things I want this to be capable of. I now have a decent idea, and so I'll be combining everything in a hopefully easier, more managable, and *more useful* way.
 
-The "slow data" analysis should be performed first. Run `python combine.py` to generate first-pass cleaned and formatted slow data (`combined.csv`). Then run `python reduce.py` to do the actual analysis on the result, providing output `ten_minutes_labeled.csv`. Once this has been done, plots may be generated and sonic analysis may be done. (Output files will be within the `outputs` directory)
+Structuring
+-----------------------
+Code up until now is in `src`. Most of the stuff in `src/old` isn't really useful anymore. I'll note that the `newsonic.py` is not currently functional. Right now, `combine.py` puts the KCC data together, `reduce.py` does basic QC and then computes useful values, and `plots.py` (as well as `roses.py` for some wind rose stuff) does a strange mix of analysis and plotting. `sonic.py` is being updated into `newsonic.py` to do an okay job handling analysis of ultrasonic data, but this is even more of a WIP. `helper_functions.py` has a variety of common statistical, scientific, or purely convenience functions used by any and all of the others.
 
-Plotting is done using the `plots.py` and `profiles.py` scripts; in the `main` entry points change what functions are called to decide what to plot.
+I'm now putting things together in `new`. Ideally this will replace `src` at some point. Within it (structuring and naming subject to much change) is: `new/lib` containing files with common functions - this is basically `helper_functions.py` split up into smaller chunks; `prepare.py` to do lots of what `reduce.py` did; `kcc.py` as an example of how everything else will be configured and called from a single file which must on its own do the standardization done by `combine.py`; `analyze.py` with analysis functionality; `plotting.py` with plotting functionality.
 
-Sonic analysis can be done without the slow data (data matching must be disabled!) but the full analysis requires both the `combined.csv` and `ten_minutes_labeled.csv` results from the slow analysis. Multiprocessing is supported: pass argument `-n <number of processors>` to determine how many CPUs are used. Example usage:
-``` 
-python sonic.py -c -n 8 --data="../../data/KCC_FluxData_106m_SAMPLE/" --target="../outputs/sonic_sample/" --match="../outputs/slow/ten_minutes_labeled.csv" --slow="../outputs/slow/combined.csv"
-```
+Right now the code is set up to assume a structure of the parent directory containing  `windprofile_characterization`. Data is assumed to be in a folder called `data` on the same level, and outputs from running `src` are put into one called `outputs` also on that same level. For my convenience as I fix things up and slowly consolidate everything into the nice neat new package, outputs from `new` are put into a folder `results` at that level rather than mushed together into `outputs`.
+
+If for some unlikely reason you are using this while I'm working on it, feel free to contact me at the above email with questions.
