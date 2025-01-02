@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import preprocess
 import compute
+from classify import TerrainClassifier, SingleClassifier
 
 # Where to pull data from
 data_directory = '../../data/KCC_SlowData'
@@ -13,8 +14,17 @@ REMOVAL_PERIODS = {
     ('2018-09-10 12:00:00','2018-09-20 12:00:00') : 'ALL' # blip at end
 }
 
-INSTRUCTIONS = {
+TERRAIN_CLASSIFIER = TerrainClassifier(complexCenter = 315,
+                                          openCenter = 135,
+                                          radius = 15,
+                                          inclusive = True,
+                                          height = 10)
 
+# STABILITY_CLASSIFIER =
+
+INSTRUCTIONS = {
+    'terrain_classifier' :  TERRAIN_CLASSIFIER,
+    #'stability_classifier' : STABILITY_CLASSIFIER,
 }
 
 # All heights (in m) that data exists at
