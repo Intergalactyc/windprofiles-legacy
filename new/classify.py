@@ -18,7 +18,7 @@ class _TemplateClassifier(ABC):
         `parameter` optionally sets the name of the parameter
             (for pd.DataFrame column selection) to classify based on
         `nanNA` is a boolean determining whether NaN values should
-            be classified as pd.NA or left to be classified as "other" 
+            be classified as None or left to be classified as "other" 
         """
         self._classNames = ["other"]
         self._rules = [None]
@@ -84,7 +84,7 @@ class _TemplateClassifier(ABC):
         classification rules defined by calls to self.add_class
         """
         if self._nanNA and self._isNaN(value):
-            return pd.NA
+            return None
         for clName, rule in zip(self._classNames, self._rules):
             if (rule is None
                 or (self._isNaN(rule)
@@ -187,7 +187,7 @@ class SingleClassifier(_TemplateClassifier):
             rightV = np.inf
         else:
             try:
-                rightV = float(split[0])
+                rightV = float(split[1])
             except ValueError:
                 raise(f"classify.SingleClassifier._parse_interval: invalid left bound '{leftV}'")
 
@@ -198,7 +198,7 @@ class SingleClassifier(_TemplateClassifier):
 
     def add_class(self,
                   class_name: str,
-                  interval: str = None,
+                  interval: str = None, *,
                   left_inclusive: int|float = None,
                   left_exclusive: int|float = None,
                   right_inclusive: int|float = None,
@@ -243,11 +243,11 @@ class SingleClassifier(_TemplateClassifier):
     def _test_value(self, value: int|float, rule: list[int|list]):
         left, right = rule
         if type(left) is list and type(right) is list:
-            return left[0] < value < right[0]
+            return left[0] <= value <= right[0]
         if type(right) is list:
-            return left < value < right[0]
+            return left < value <= right[0]
         if type(left) is list:
-            return left[0] < value < right
+            return left[0] <= value < right
         return left < value < right
 
 # Future: add MultiClassifier which allows for classification

@@ -14,13 +14,18 @@ REMOVAL_PERIODS = {
     ('2018-09-10 12:00:00','2018-09-20 12:00:00') : 'ALL' # blip at end
 }
 
+# Define the terrain classification scheme
 TERRAIN_CLASSIFIER = TerrainClassifier(complexCenter = 315,
                                           openCenter = 135,
                                           radius = 15,
                                           inclusive = True,
                                           height = 10)
 
-# STABILITY_CLASSIFIER =
+# Define 3-class bulk Richardson number stability classification scheme
+STABILITY_CLASSIFIER = SingleClassifier(parameter = 'Ri_bulk')
+STABILITY_CLASSIFIER.add_class('unstable', '(-inf,-0.1)')
+STABILITY_CLASSIFIER.add_class('neutral', '[-0.1,0.1]')
+STABILITY_CLASSIFIER.add_class('stable', '(0.1,inf)')
 
 INSTRUCTIONS = {
     'terrain_classifier' :  TERRAIN_CLASSIFIER,
