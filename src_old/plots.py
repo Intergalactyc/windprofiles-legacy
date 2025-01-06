@@ -775,13 +775,13 @@ def hist_alpha_by_stability(classifier = hf.stability_class_3, variable = 'ri', 
     return
 
 if __name__ == '__main__':
-    alpha_tod_violins(fit = True)
+    #alpha_tod_violins(fit = True)
 
     # alpha_vs_lapse()
     # alpha_vs_ri()
 
-    # total_data_available()
-    # boom_data_available()
+    total_data_available()
+    boom_data_available()
 
     # for h in [6, 10, 20]:
     #     stability_plots(stability = default_stability, height = h)

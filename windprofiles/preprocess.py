@@ -3,7 +3,7 @@
 
 import numpy as np
 import pandas as pd
-import lib.polar as polar
+import windprofiles.lib.polar as polar
 import warnings
 
 # DO NOT CHANGE STANDARDS WITHOUT ALL CORRESPONDING UPDATES
@@ -181,7 +181,7 @@ def clean_formatting(df, type = 'float32', silent = False):
                 dircol = f'wd_{heightStr}'
                 result.loc[result[column] == 0, dircol] = np.nan
 
-    result = result.reset_index().sort_values(by = 'time').set_index('time')
+    result = result.reset_index(names = 'time').sort_values(by = 'time').set_index('time')
     result = result[~result.index.duplicated(keep = 'first')]
     
     if not silent:
@@ -254,7 +254,7 @@ def remove_data(df: pd.DataFrame, periods: dict, silent: bool = False) -> pd.Dat
     If silent == False then #s of total and partial removals
         will be printed.
     """
-    result = df.copy().reset_index(names = 'time')
+    result = df.reset_index(names = 'time')
     
     total_removals = 0
     partial_removals = 0
@@ -354,3 +354,8 @@ def resample(df: pd.DataFrame,
         print(f'\t{dropped} removals of NaN rows ({100*dropped/before_drop:.4f}%), resulting in {resampled.shape[0]} final data points')
     
     return resampled
+
+def convert_timezone(df: pd.DataFrame, source_timezone: str, target_timezone: str):
+    result = df.copy()
+    result.index = df.index.tz_localize(source_timezone).tz_convert(target_timezone)
+    return result

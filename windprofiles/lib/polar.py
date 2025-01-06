@@ -1,18 +1,26 @@
 import numpy as np
 import pandas as pd
+from numbers import Number
 
 def wind_components(speed, direction, degrees: bool = True):
     """
     Given a wind speed and direction in degrees CW of N,
         return u, v (east, north) Cartesian components of wind.
     Apply generally to vectors.
-    Can be used with numerical data types, pd.Series, or dimension-1 np.Array.
+    Can be used with numerical data types or pd.Series.
     """
     direction_rad = np.deg2rad(direction) if degrees else direction
     u = speed * np.sin(direction_rad)
     v = speed * np.cos(direction_rad)
-    u.loc[speed == 0] = 0.
-    v.loc[speed == 0] = 0.
+    if isinstance(speed, Number):
+        if speed == 0:
+            u = 0.
+            v = 0.
+    elif type(speed) == pd.Series:
+        u.loc[speed == 0] = 0.
+        v.loc[speed == 0] = 0.
+    else:
+        raise(f'windprofiles.lib.polar.wind_components - unknown speed array type {type(speed)}')
     return u, v
 
 def polar_wind(u, v, degrees: bool = True):

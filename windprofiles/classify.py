@@ -6,7 +6,7 @@ import pandas as pd
 import numpy as np
 from warnings import warn
 from abc import ABC, abstractmethod
-import lib.polar as polar
+from windprofiles.lib.polar import angular_distance
 from numbers import Number
 
 class _TemplateClassifier(ABC):
@@ -104,7 +104,7 @@ class _TemplateClassifier(ABC):
         if self._parameter is not None:
             if self._parameter not in df.columns:
                 raise(f"classify._TemplateClassifier.classify_rows: parameter {self._parameter} not found in columns of given pd.DataFrame")
-            return df.apply(lambda row : self.classify(row[self._parameter]))
+            return df.apply(lambda row : self.classify(row[self._parameter]), axis = 1)
         else:
             raise("classify._TemplateClassifier.classify_rows: no parameter provided")
 
@@ -147,9 +147,9 @@ class PolarClassifier(_TemplateClassifier):
     def _test_value(self, value, rule):
         center, radius = rule
         if type(radius) is list:
-            return polar.angular_distance(value, center) <= radius[0]
+            return angular_distance(value, center) <= radius[0]
         else:
-            return polar.angular_distance(value, center) < radius
+            return angular_distance(value, center) < radius
 
 class SingleClassifier(_TemplateClassifier):
     """
@@ -346,3 +346,16 @@ class TerrainClassifier(PolarClassifier):
         Get the classification column name
         """
         return self._heightCol
+
+class StabilityClassifier(SingleClassifier):
+    def __init__(self, parameter: str = None, classes: list[tuple[str, str]] = None):
+        """
+        Slightly easier setup for a stability-type SingleClassifer.
+        `classes` should be a list of tuples in which the first entry is the class
+            name and the second is a properly formatted selection interval. 
+        """
+        if parameter is None or type(parameter) is not str:
+            warn('classify.StabilityClassifier: No valid classification parameter given, make sure to call object method set_parameter to add one')
+        super().__init__(parameter = parameter, nanNA = True)
+        for cName, cInterval in classes:
+            self.add_class(class_name = cName, interval = cInterval)

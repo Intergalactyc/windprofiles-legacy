@@ -1,4 +1,4 @@
-import windprofile_characterization.src.old_rose.customroses as customroses
+import windprofile_characterization.windprofiles.old_rose.customroses as customroses
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.animation as anim
