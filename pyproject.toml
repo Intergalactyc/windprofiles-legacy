@@ -26,8 +26,8 @@ dependencies = [
 ]
 
 [project.urls]
-Source = "https://github.com/Intergalactyc/windprofile_characterization"
-Homepage = "https://github.com/Intergalactyc/windprofile_characterization"
+Source = "https://github.com/Intergalactyc/WindProfiles"
+Homepage = "https://github.com/Intergalactyc/WindProfiles"
 
 [tool.setuptools.packages.find]
 where = ["."]

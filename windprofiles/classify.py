@@ -104,16 +104,18 @@ class _TemplateClassifier(ABC):
         if self._parameter is not None:
             if self._parameter not in df.columns:
                 raise(f"classify._TemplateClassifier.classify_rows: parameter {self._parameter} not found in columns of given pd.DataFrame")
-            return df.apply(lambda row : self.classify(row[self._parameter]), axis = 1)
+            return df.apply(lambda row : self.classify(row[self._parameter]), axis = 1).astype('category')
         else:
             raise("classify._TemplateClassifier.classify_rows: no parameter provided")
 
-    def get_classes(self) -> list:
+    def get_classes(self, other: bool = True) -> list:
         """
         Public getter method that returns a list of the class names.
         Ordered by precedence: earlier is attempted first.
         """
-        return self._classNames
+        if other:
+            return self._classNames
+        return self._classNames[:-1]
 
 class PolarClassifier(_TemplateClassifier):
     """

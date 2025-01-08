@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import windprofiles.lib.atmos as atmos
+import windprofiles.lib.stats as stats
 from windprofiles.classify import TerrainClassifier, PolarClassifier, StabilityClassifier, SingleClassifier
 from warnings import warn
 
@@ -92,13 +93,19 @@ def bulk_richardson_number(df: pd.DataFrame, heights: list[int, int], *, silent:
 
     return result
 
-def classifications(df: pd.DataFrame, *, terrain_classifier: PolarClassifier|TerrainClassifier = None, stability_classifier: SingleClassifier|StabilityClassifier = None) -> pd.DataFrame:
+def classifications(df: pd.DataFrame, *, terrain_classifier: PolarClassifier|TerrainClassifier = None, stability_classifier: SingleClassifier|StabilityClassifier = None, silent: bool = False) -> pd.DataFrame:
     """
     Classify terrain and/or stability for each timestamp in a dataframe.
     Creates a new column in the dataframe for each type of result.
     """
     if terrain_classifier is None and stability_classifier is None:
         warn('Neither terrain nor stability classifier passed')
+
+    if not silent:
+        tc = terrain_classifier is not None
+        sc = stability_classifier is not None
+        bth = tc and sc
+        print(f'compute.classifications() - classifying {"terrain" * tc}{" and " * bth}{"stability" * sc}')
         
     result = df.copy()
 
@@ -106,5 +113,42 @@ def classifications(df: pd.DataFrame, *, terrain_classifier: PolarClassifier|Ter
         result['terrain'] = terrain_classifier.classify_rows(result)
     if stability_classifier is not None:
         result['stability'] = stability_classifier.classify_rows(result)
+
+    if not silent:
+        print('\tCompleted classifications')
+
+    return result
+
+def power_law_fits(df: pd.DataFrame, heights: list[int], minimum_present: int = 2, columns: list[str, str] = ['beta', 'alpha'], silent: bool = False):
+    """
+    Fit power law u(z) = A z ^ B to each timestamp in a dataframe.
+    Creates new columns columns[0] and column[1] for the coefficients
+        A and B ('beta' and 'alpha' by default) respectively.
+    """
+    if not silent:
+        print(f'compute.power_law_fits() - computing power law fits using {heights}')
+
+    if type(minimum_present) is not int or minimum_present < 2:
+        raise(f'windprofiles.compute.power_law_fits - invalid argument \'{minimum_present}\' passed to \'minimum_present\'')
+    if len(heights) < minimum_present:
+        raise(f'windprofiles.compute.power_law_fits - insufficient number of heights provided') 
+    if type(columns) not in [tuple, list] or len(columns) != 2:
+        raise(f'windprofiles.compute.power_law_fits - \'columns\' must be a tuple or list of two column names for the multiplicative coefficient and power, respectively')
+
+    result = df.copy()
+
+    result[['A_PRIMITIVE', 'B_PRIMITIVE']] = result.apply(lambda row : stats.power_fit(heights, [row[f'ws_{height}m'] for height in heights], require = minimum_present), axis = 1, result_type='expand')
+
+    if columns[0] is None:
+        result.drop(columns = ['A_PRIMITIVE'], inplace = True)
+    elif type(columns[0]) is str:
+        result.rename(columns = {'A_PRIMITIVE' : columns[0]}, inplace = True)
+    if columns[1] is None:
+        result.drop(columns = ['B_PRIMITIVE'], inplace = True)
+    elif type(columns[1]) is str:
+        result.rename(columns = {'B_PRIMITIVE' : columns[1]}, inplace = True)
+
+    if not silent:
+        print(f'\tCompleted computation, multiplicative coefficient stored in {columns[0]} and exponent stored in {columns[1]}')
 
     return result

@@ -1,4 +1,4 @@
-windprofile_characterization: GLWind Wind Profile Characterization
+WindProfiles: GLWind Wind Profile Characterization
 ====================================
 
 Author: Elliott Walker (walker.elliott.j@gmail.com)
@@ -10,23 +10,16 @@ Required Python packages
 numpy
 pandas
 matplotlib
-seaborn
 tqdm
-argparse
-multiprocessing
 scipy
 windrose
 
-Why is this a mess?
------------------------
-Up until now I've just been throwing stuff together to see what works and get an idea of what kind of things I want this to be capable of. I now have a decent idea, and so I'll be combining everything in a hopefully easier, more managable, and *more useful* way.
-
 Structuring
 -----------------------
-Code up until now is in `src`. Most of the stuff in `src/old` isn't really useful anymore. I'll note that the `newsonic.py` is not currently functional. Right now, `combine.py` puts the KCC data together, `reduce.py` does basic QC and then computes useful values, and `plots.py` (as well as `roses.py` for some wind rose stuff) does a strange mix of analysis and plotting. `sonic.py` is being updated into `newsonic.py` to do an okay job handling analysis of ultrasonic data, but this is even more of a WIP. `helper_functions.py` has a variety of common statistical, scientific, or purely convenience functions used by any and all of the others.
+Code up until now is in `src_old/`. Most of the stuff in `src_old/old` isn't really useful anymore. I'll note that the `newsonic.py` is not currently functional. Right now, `combine.py` puts the KCC data together, `reduce.py` does basic QC and then computes useful values, and `plots.py` (as well as `roses.py` for some wind rose stuff) does a strange mix of analysis and plotting. `sonic.py` is being updated into `newsonic.py` to do an okay job handling analysis of ultrasonic data, but this is even more of a WIP. `helper_functions.py` has a variety of common statistical, scientific, or purely convenience functions used by any and all of the others.
 
-I'm now putting things together in `new`. Ideally this will replace `src` at some point. Within it (structuring and naming subject to much change) is: `new/lib` containing files with common functions - this is basically `helper_functions.py` split up into smaller chunks; `prepare.py` to do lots of what `reduce.py` did; `kcc.py` as an example of how everything else will be configured and called from a single file which must on its own do the standardization done by `combine.py`; `analyze.py` with analysis functionality; `plotting.py` with plotting functionality.
+I'm now putting things together in the `windprofiles` package. Ideally this will replace `src` at some point. Within it are the main modules, as well as a subpackage `lib/` containing files with common functions - this is basically the old `helper_functions.py` split up into smaller chunks.
 
-Right now the code is set up to assume a structure of the parent directory containing  `windprofile_characterization`. Data is assumed to be in a folder called `data` on the same level, and outputs from running `src` are put into one called `outputs` also on that same level. For my convenience as I fix things up and slowly consolidate everything into the nice neat new package, outputs from `new` are put into a folder `results` at that level rather than mushed together into `outputs`.
+Analysis using the `windprofiles` package is in the `analysis` directory: `kcc.py` handles the analysis of the Cedar Rapids KCC met tower data.
 
 If for some unlikely reason you are using this while I'm working on it, feel free to contact me at the above email with questions.

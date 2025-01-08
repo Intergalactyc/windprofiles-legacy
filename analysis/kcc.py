@@ -163,59 +163,75 @@ def compute_values(df,
                                  terrain_classifier = terrain_classifier,
                                  stability_classifier = stability_classifier)
     
-    # df = compute.power_law_fits(df = df,
-    #                             heights = [],
-    #                             minimum_present = 3,
-    #                             )
+    df = compute.power_law_fits(df = df,
+                                heights = HEIGHTS,
+                                minimum_present = 3,
+                                columns = [None,'alpha'])
         
     print("END COMPUTATIONS")
 
     return df
 
+def temp_plots(df):
+    import windprofiles.ipplot as plot
+    #plot.hist_alpha_by_stability(df, separate = True, compute = True, overlay = True)
+    #plot.alpha_tod_violins(df, fit = False)
+    #plot.alpha_tod_violins(df, fit = True)
+    #plot.alpha_tod_violins_by_terrain(df)
+    plot.ri_tod_violins(df, fit = False, cut = 25, printcutfrac = True, bounds = (-5,3))
+
 if __name__ == '__main__':
+    RELOAD = False
+
     PARENTDIR = 'C:/Users/22wal/OneDrive/GLWind'
+    if RELOAD:
+        df = load_data(
+            data_directory = f'{PARENTDIR}/data/KCC_SlowData',
+            outer_merges = False,
+        )
 
-    df = load_data(
-        data_directory = f'{PARENTDIR}/data/KCC_SlowData',
-        outer_merges = False,
-    )
+        df = perform_preprocessing(
+            df = df,
+            shadowing_width = 30, # width, in degrees, of shadowing bins
+            removal_periods = {
+                ('2018-03-05 13:20:00','2018-03-10 00:00:00') : 'ALL', # large maintenance gap
+                ('2018-04-18 17:40:00','2018-04-19 14:20:00') : [106], # small maintenance-shaped gap
+                ('2018-09-10 12:00:00','2018-09-20 12:00:00') : 'ALL' # blip at end
+            },
+            outlier_window = 30, # Duration, in minutes, of rolling outlier removal window
+            outlier_sigma = 5, # Number of standard deviations beyond which to discard outliers in rolling removal
+            resampling_window = 10, # Duration, in minutes, of resampling window
+        )
 
-    df = perform_preprocessing(
-        df = df,
-        shadowing_width = 30, # width, in degrees, of shadowing bins
-        removal_periods = {
-            ('2018-03-05 13:20:00','2018-03-10 00:00:00') : 'ALL', # large maintenance gap
-            ('2018-04-18 17:40:00','2018-04-19 14:20:00') : [106], # small maintenance-shaped gap
-            ('2018-09-10 12:00:00','2018-09-20 12:00:00') : 'ALL' # blip at end
-        },
-        outlier_window = 30, # Duration, in minutes, of rolling outlier removal window
-        outlier_sigma = 5, # Number of standard deviations beyond which to discard outliers in rolling removal
-        resampling_window = 10, # Duration, in minutes, of resampling window
-    )
+        # Define 3-class bulk Richardson number stability classification scheme
+        stability_classifier = StabilityClassifier(
+            parameter = 'Ri_bulk',
+            classes = [
+                ('unstable', '(-inf,-0.1)'),
+                ('neutral', '[-0.1,0.1]'),
+                ('stable', '(0.1,inf)')
+            ]
+        )
 
-    # Define 3-class bulk Richardson number stability classification scheme
-    stability_classifier = StabilityClassifier(
-        parameter = 'Ri_bulk',
-        classes = [
-            ('unstable', '(-inf,-0.1)'),
-            ('neutral', '[-0.1,0.1]'),
-            ('stable', '(0.1,inf)')
-        ]
-    )
+        # Define the terrain classification scheme
+        terrain_classifier = TerrainClassifier(
+            complexCenter = 315,
+            openCenter = 135,
+            radius = 15,
+            inclusive = True,
+            height = 10
+        )
 
-    # Define the terrain classification scheme
-    terrain_classifier = TerrainClassifier(
-        complexCenter = 315,
-        openCenter = 135,
-        radius = 15,
-        inclusive = True,
-        height = 10
-    )
+        df = compute_values(
+            df = df,
+            terrain_classifier = terrain_classifier,
+            stability_classifier = stability_classifier
+        )
 
-    df = compute_values(
-        df = df,
-        terrain_classifier = terrain_classifier,
-        stability_classifier = stability_classifier
-    )
+        save(df, f'{PARENTDIR}/results/output.csv')
 
-    save(df, f'{PARENTDIR}/results/output.csv')
+    df = pd.read_csv(f'{PARENTDIR}/results/output.csv')
+    df['time'] = pd.to_datetime(df['time'], utc=True) # will convert to UTC!
+    df['time'] = df['time'].dt.tz_convert('US/Central')
+    df.dropna(axis = 'rows', how = 'any', subset = ['Ri_bulk','alpha'], inplace = True)
+    temp_plots(df)
