@@ -182,8 +182,17 @@ def temp_plots(df):
 
 if __name__ == '__main__':
     RELOAD = False
+    PARENTDIR = 'C:/Users/22wal/OneDrive/GLWind' # If you are not Elliott and this is not the path for you then pass argument -p followed by the correct path when running!
 
-    PARENTDIR = 'C:/Users/22wal/OneDrive/GLWind'
+    if len(sys.argv) > 1:
+        if '-r' in sys.argv:
+            RELOAD = True
+        if '-p' in sys.argv:
+            p_index = sys.argv.index('-p')
+            if p_index == len(sys.argv) - 1:
+                raise('Must follow -p flag with path to parent directory (directory containing /data/), in UNIX format without any quotation marks')
+            PARENTDIR = sys.argv[p_index + 1]
+    
     if RELOAD:
         df = load_data(
             data_directory = f'{PARENTDIR}/data/KCC_SlowData',
@@ -229,6 +238,8 @@ if __name__ == '__main__':
         )
 
         save(df, f'{PARENTDIR}/results/output.csv')
+    else:
+        print('RELOAD set to False, will use previous output.')
 
     df = pd.read_csv(f'{PARENTDIR}/results/output.csv')
     df['time'] = pd.to_datetime(df['time'], utc=True) # will convert to UTC!

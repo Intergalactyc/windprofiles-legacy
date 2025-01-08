@@ -23,3 +23,11 @@ I'm now putting things together in the `windprofiles` package. Ideally this will
 Analysis using the `windprofiles` package is in the `analysis` directory: `kcc.py` handles the analysis of the Cedar Rapids KCC met tower data.
 
 If for some unlikely reason you are using this while I'm working on it, feel free to contact me at the above email with questions.
+
+Package install
+----------------------
+To install from source, from the `WindProfiles` directory run `python3 -m pip install .`. To install in editing mode pass the flag -e to pip install: `python3 -m pip install -e .`. This will make it so that local changes are immediately reflected in usage of the package, rather than requiring reinstall/update every time you make a change locally - useful in development.
+
+Usage
+----------------------
+See `analysis/kcc.py` for an example of using the package. This can be run from scratch by calling `python3 ./analysis/kcc.py -r`, omitting the `-r` after first use to not re-load and re-compute all data (instead just repeating the further analysis and plotting). You will, unless you are Elliott, also have to pass `-p <PARENT-DIRECTORY-PATH>` specifying the path to the directory within which a subdirectory `data` containing the properly formatted `/KCC_SlowData/` directory exists. (If you need this, which you likely do because the format of the files matters, contact me at the above email!)

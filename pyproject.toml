@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "WindProfiles"
 version = "0.0.1"
 description = "Wind profile data analysis and characterization related to GLWind project"
-readme = "README.md"  # The content type is inferred automatically
+readme = "README.md"
 license = { text = "LICENSE.txt" }
 authors = [
     { name = "Elliott Walker", email = "walker.elliott.j@gmail.com" }
