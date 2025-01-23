@@ -7,6 +7,18 @@ from warnings import warn
 
 STANDARD_GRAVITY = 9.80665 # standard gravitational parameter g in m/s^2
 
+def strip_failures(df: pd.DataFrame, subset: list[str], silent: bool = False):
+    if not silent:
+        print('compute.strip_failures() - removing rows where necessary computations failed')
+
+    result = df.dropna(axis = 'rows', how = 'any', subset = subset)
+
+    if not silent:
+        n_dropped = len(df) - len(result)
+        print(f'\tRemoved {n_dropped} rows, {len(result)} remain')
+
+    return result
+
 def virtual_potential_temperatures(df: pd.DataFrame, heights: list[int], *, silent: bool = False, substitutions: dict[str:str] = None) -> pd.DataFrame:
     """
     Compute virtual potential temperatures at all given heights.

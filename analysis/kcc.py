@@ -117,7 +117,8 @@ def perform_preprocessing(df,
     df = preprocess.clean_formatting(df = df, type = 'float32')
 
     # Remove data according to REMOVAL_PERIODS
-    df = preprocess.remove_data(df = df, periods = removal_periods)
+    if removal_periods is not None:
+        df = preprocess.remove_data(df = df, periods = removal_periods)
 
     # Convert time index from UTC to local time
     df = preprocess.convert_timezone(df = df,
@@ -136,6 +137,11 @@ def perform_preprocessing(df,
                             how = 'mean',
                             all_heights = HEIGHTS,)
                             # deviations = [f'ws_{h}m' for h in HEIGHTS])
+
+    # Remove rows where there isn't enough data
+    df = preprocess.strip_missing_data(df = df,
+                                    necessary = [10, 106],
+                                    minimum = 3)
 
     print("END DATA PREPROCESSING")
 
@@ -165,8 +171,18 @@ def compute_values(df,
     
     df = compute.power_law_fits(df = df,
                                 heights = HEIGHTS,
-                                minimum_present = 3,
                                 columns = [None,'alpha'])
+    
+    df = compute.power_law_fits(df = df,
+                                heights = [6, 10, 20, 32, 80],
+                                columns = [None,'alpha_no106'])
+    
+    df = compute.power_law_fits(df = df,
+                                heights = [6, 10, 20, 80, 106],
+                                columns = [None,'alpha_no32'])
+    
+    df = compute.strip_failures(df = df,
+                                subset = ['Ri_bulk','alpha'])
         
     print("END COMPUTATIONS")
 
@@ -176,9 +192,19 @@ def temp_plots(df):
     import ipplot as plot
     #plot.hist_alpha_by_stability(df, separate = True, compute = True, overlay = True)
     #plot.alpha_tod_violins(df, fit = False)
-    #plot.alpha_tod_violins(df, fit = True)
-    #plot.alpha_tod_violins_by_terrain(df)
-    plot.ri_tod_violins(df, fit = False, cut = 25, printcutfrac = True, bounds = (-5,3))
+
+    tod_dir = 'C:/Users/22wal/OneDrive/Pictures/temp/tods_wider'
+    plot.alpha_tod_violins(df, fit = True, saveto = f'{tod_dir}/year.png')
+    plot.alpha_tod_violins_by_terrain(df, fit = True, saveto = f'{tod_dir}/yearT.png')
+    for season in ['Fall', 'Winter', 'Spring', 'Summer']:
+        plot.alpha_tod_violins(df, season = season, fit = True, saveto = f'{tod_dir}/{season.lower()}.png')
+        plot.alpha_tod_violins_by_terrain(df, season = season, fit = True, saveto = f'{tod_dir}/{season.lower()}T.png') 
+
+    #plot.ri_tod_violins(df, fit = False, cut = 25, printcutfrac = True, bounds = (-5,3))
+    ###plot.boom_data_available(df, freq = '10min', heights = HEIGHTS)
+    #plot.alpha_over_time(df)
+    #plot.comparison(df, which = ['alpha', 'alpha_no106'], xlims=(-0.5,1), ylims = (-0.5,1))
+    #plot.comparison(df, which = ['alpha', 'alpha_no32'], xlims=(-0.5,1), ylims = (-0.5,1))
 
 if __name__ == '__main__':
     RELOAD = False
@@ -226,7 +252,7 @@ if __name__ == '__main__':
         terrain_classifier = TerrainClassifier(
             complexCenter = 315,
             openCenter = 135,
-            radius = 15,
+            radius = 30,
             inclusive = True,
             height = 10
         )
@@ -244,5 +270,9 @@ if __name__ == '__main__':
     df = pd.read_csv(f'{PARENTDIR}/results/output.csv')
     df['time'] = pd.to_datetime(df['time'], utc=True) # will convert to UTC!
     df['time'] = df['time'].dt.tz_convert('US/Central')
-    df.dropna(axis = 'rows', how = 'any', subset = ['Ri_bulk','alpha'], inplace = True)
+    
     temp_plots(df)
+
+    print(len(df[df['alpha'] < 0]))
+    print(len(df))
+    
