@@ -173,7 +173,7 @@ def compute_values(df,
     return df
 
 def temp_plots(df):
-    import windprofiles.ipplot as plot
+    import ipplot as plot
     #plot.hist_alpha_by_stability(df, separate = True, compute = True, overlay = True)
     #plot.alpha_tod_violins(df, fit = False)
     #plot.alpha_tod_violins(df, fit = True)

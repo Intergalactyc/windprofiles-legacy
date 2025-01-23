@@ -68,7 +68,7 @@ def hist_alpha_by_stability(df, separate = False, compute = True, overlay = True
                     alpha = 0.55 - 0.05*i,
                     edgecolor = 'k',
                     label = label,
-                    )            
+                    )
         ax.legend()
 
     fig.suptitle(r'$\alpha$ Distribution by Stability' + titleextra)
