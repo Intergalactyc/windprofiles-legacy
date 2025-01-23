@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import windprofiles.preprocess as preprocess
 import windprofiles.compute as compute
+import windprofiles.storms as storms
 from windprofiles.classify import TerrainClassifier, StabilityClassifier
 from windprofiles.analyze import save
 import sys
@@ -193,18 +194,25 @@ def temp_plots(df):
     #plot.hist_alpha_by_stability(df, separate = True, compute = True, overlay = True)
     #plot.alpha_tod_violins(df, fit = False)
 
-    tod_dir = 'C:/Users/22wal/OneDrive/Pictures/temp/tods_wider'
-    plot.alpha_tod_violins(df, fit = True, saveto = f'{tod_dir}/year.png')
-    plot.alpha_tod_violins_by_terrain(df, fit = True, saveto = f'{tod_dir}/yearT.png')
-    for season in ['Fall', 'Winter', 'Spring', 'Summer']:
-        plot.alpha_tod_violins(df, season = season, fit = True, saveto = f'{tod_dir}/{season.lower()}.png')
-        plot.alpha_tod_violins_by_terrain(df, season = season, fit = True, saveto = f'{tod_dir}/{season.lower()}T.png') 
+    # tod_dir = 'C:/Users/22wal/OneDrive/Pictures/temp/tods_wider'
+    # plot.alpha_tod_violins(df, fit = True, saveto = f'{tod_dir}/year.png')
+    # plot.alpha_tod_violins_by_terrain(df, fit = True, saveto = f'{tod_dir}/yearT.png')
+    # for season in ['Fall', 'Winter', 'Spring', 'Summer']:
+    #     plot.alpha_tod_violins(df, season = season, fit = True, saveto = f'{tod_dir}/{season.lower()}.png')
+    #     plot.alpha_tod_violins_by_terrain(df, season = season, fit = True, saveto = f'{tod_dir}/{season.lower()}T.png') 
+
+    
 
     #plot.ri_tod_violins(df, fit = False, cut = 25, printcutfrac = True, bounds = (-5,3))
     ###plot.boom_data_available(df, freq = '10min', heights = HEIGHTS)
     #plot.alpha_over_time(df)
     #plot.comparison(df, which = ['alpha', 'alpha_no106'], xlims=(-0.5,1), ylims = (-0.5,1))
     #plot.comparison(df, which = ['alpha', 'alpha_no32'], xlims=(-0.5,1), ylims = (-0.5,1))
+    return
+
+def get_storm_events():
+    storms.test()
+    return None
 
 if __name__ == '__main__':
     RELOAD = False
@@ -262,6 +270,8 @@ if __name__ == '__main__':
             terrain_classifier = terrain_classifier,
             stability_classifier = stability_classifier
         )
+
+        storm_events = get_storm_events()
 
         save(df, f'{PARENTDIR}/results/output.csv')
     else:
