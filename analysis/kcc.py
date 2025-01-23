@@ -193,12 +193,14 @@ def temp_plots(df):
     #plot.hist_alpha_by_stability(df, separate = True, compute = True, overlay = True)
     #plot.alpha_tod_violins(df, fit = False)
 
-    tod_dir = 'C:/Users/22wal/OneDrive/Pictures/temp/tods_wider'
-    plot.alpha_tod_violins(df, fit = True, saveto = f'{tod_dir}/year.png')
-    plot.alpha_tod_violins_by_terrain(df, fit = True, saveto = f'{tod_dir}/yearT.png')
-    for season in ['Fall', 'Winter', 'Spring', 'Summer']:
-        plot.alpha_tod_violins(df, season = season, fit = True, saveto = f'{tod_dir}/{season.lower()}.png')
-        plot.alpha_tod_violins_by_terrain(df, season = season, fit = True, saveto = f'{tod_dir}/{season.lower()}T.png') 
+    # tod_dir = 'C:/Users/22wal/OneDrive/Pictures/temp/tods_wider'
+    # plot.alpha_tod_violins(df, fit = True, saveto = f'{tod_dir}/year.png')
+    # plot.alpha_tod_violins_by_terrain(df, fit = True, saveto = f'{tod_dir}/yearT.png')
+    # for season in ['Fall', 'Winter', 'Spring', 'Summer']:
+    #     plot.alpha_tod_violins(df, season = season, fit = True, saveto = f'{tod_dir}/{season.lower()}.png')
+    #     plot.alpha_tod_violins_by_terrain(df, season = season, fit = True, saveto = f'{tod_dir}/{season.lower()}T.png') 
+
+    
 
     #plot.ri_tod_violins(df, fit = False, cut = 25, printcutfrac = True, bounds = (-5,3))
     ###plot.boom_data_available(df, freq = '10min', heights = HEIGHTS)
