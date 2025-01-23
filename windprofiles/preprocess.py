@@ -359,3 +359,42 @@ def convert_timezone(df: pd.DataFrame, source_timezone: str, target_timezone: st
     result = df.copy()
     result.index = df.index.tz_localize(source_timezone).tz_convert(target_timezone)
     return result
+
+def strip_missing_data(df: pd.DataFrame, necessary: list[int], minimum: int = 4, silent: bool = False):
+    """
+    Remove rows where there are fewer than `minimum` wind speed columns or where
+        wind speeds are missing at any of the `necessary` heights
+    """
+    result = df.copy()
+
+    if not silent:
+        print('preprocess.strip_missing_data() - beginning removals')
+
+    cols = result.columns
+
+    necessarys = [f'ws_{h}m' for h in necessary]
+    ws_cols = []
+    for col in cols:
+        if 'ws_' in col:
+           ws_cols.append(col) 
+
+    removed = 0
+    iterable = result.iterrows()
+    for index, row in iterable:
+        drop = False
+        for necessary in necessarys:
+            if pd.isna(row[necessary]):
+                drop = True
+                break
+        count = 0
+        for col in ws_cols:
+            if not pd.isna(row[col]):
+                count += 1
+        if drop or count < minimum:
+            result.drop(index = index, inplace = True)
+            removed += 1
+
+    if not silent:
+        print(f'\tRemovals complete ({removed} rows dropped)')
+
+    return result

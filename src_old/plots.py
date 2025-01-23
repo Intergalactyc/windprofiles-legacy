@@ -780,8 +780,8 @@ if __name__ == '__main__':
     # alpha_vs_lapse()
     # alpha_vs_ri()
 
-    total_data_available()
-    boom_data_available()
+    # total_data_available()
+    # boom_data_available()
 
     # for h in [6, 10, 20]:
     #     stability_plots(stability = default_stability, height = h)
@@ -819,3 +819,11 @@ if __name__ == '__main__':
     # print_terrain_monthly()
     # plot_terrain_monthly(other = False, proportions=True) # Do something like these with stability?
     # plot_terrain_monthly(other = True, proportions=False)
+
+    dfNew = pd.read_csv('C:/Users/22wal/OneDrive/GLWind/results/output.csv')
+    dfNew['time'] = pd.to_datetime(dfNew['time'], utc=True)
+    dfNew['time'] = dfNew['time'].dt.tz_convert('US/Central')
+    plot_terrain_monthly(data = dfNew, other = False, proportions=True, radius = 15)
+    plot_terrain_monthly(data = dfNew, other = True, proportions=False, radius = 15)
+    plot_terrain_monthly(data = dfNew, other = False, proportions=True, radius = 30)
+    plot_terrain_monthly(data = dfNew, other = True, proportions=False, radius = 30)
