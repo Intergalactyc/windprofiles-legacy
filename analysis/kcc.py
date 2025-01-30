@@ -3,7 +3,7 @@ import numpy as np
 import windprofiles.preprocess as preprocess
 import windprofiles.compute as compute
 import windprofiles.storms as storms
-from windprofiles.classify import TerrainClassifier, StabilityClassifier
+from windprofiles.classify import TerrainClassifier, StabilityClassifier, CoordinateRegion
 from windprofiles.analyze import save
 import sys
 import os
@@ -12,12 +12,17 @@ import os
 SOURCE_TIMEZONE = 'UTC'
 LOCAL_TIMEZONE = 'US/Central'
 
+# Start and end times of data (for storm and precipitation matching)
+START_TIME = pd.to_datetime('2017-09-21 19:00:00-05:00')
+END_TIME = pd.to_datetime('2018-08-29 00:30:00-05:00')
+
 # Local gravity at Cedar Rapids (latitude ~ 42 degrees, elevation ~ 247 m), in m/s^2
 LOCAL_GRAVITY = 9.802
 
 # Latitude and longitude of KCC met tower, each in degrees
 LATITUDE = 41.91
 LONGITUDE = -91.65
+ELEVATION_METERS = 247
 
 SOURCE_UNITS = {
         'p' : 'mmHg',
@@ -30,6 +35,23 @@ SOURCE_UNITS = {
 # All heights (in m) that data exists at
 # Data columns will (and must) follow '{type}_{height}m' format
 HEIGHTS = [6, 10, 20, 32, 80, 106]
+
+STORM_FILES = [
+    "C:/Users/22wal/OneDrive/GLWind/data/StormEvents/StormEvents_details-ftp_v1.0_d2017_c20250122.csv",
+    "C:/Users/22wal/OneDrive/GLWind/data/StormEvents/StormEvents_details-ftp_v1.0_d2018_c20240716.csv"
+]
+
+CID_DATA_PATH = "C:/Users/22wal/OneDrive/GLWind/data/CID/CID_Sep012017_Aug312018.csv"
+
+CID_UNITS = {
+        'p' : f'mBar_{ELEVATION_METERS}asl',
+        't' : 'C',
+        'rh' : '%',
+        'ws' : 'mph',
+        'wd' : ['degrees', 'N', 'CW'],
+}
+
+CID_TRACE = 0.0001
 
 def load_data(data_directory: str, outer_merges: bool = False):
     print('START DATA LOADING')
@@ -88,17 +110,23 @@ def load_data(data_directory: str, outer_merges: bool = False):
 
     print("END DATA LOADING")
 
-    return df
+    return df.reset_index()
     
 def perform_preprocessing(df,
                           shadowing_width,
                           removal_periods, # These will be passed in UTC so we will do the removal before converting data time to local US/Central
                           outlier_window,
                           outlier_sigma,
-                          resampling_window):
+                          resampling_window,
+                          storm_events = None,
+                          weather_data = None,
+                          storm_removal = None):
     print("START DATA PREPROCESSING")
+    
+    doWeather = not(storm_events is None or weather_data is None or storm_removal is None)
+
     # Automatically convert units of all columns to standards as outlined in convert.py
-    df = preprocess.convert_dataframe_units(df = df, from_units = SOURCE_UNITS)
+    df = preprocess.convert_dataframe_units(df = df, from_units = SOURCE_UNITS, gravity = LOCAL_GRAVITY)
 
     # Conditionally merge wind data from booms 6 and 7
     # Boom 6 (106m1, west side) is shadowed near 90 degrees (wind from east)
@@ -139,7 +167,17 @@ def perform_preprocessing(df,
                             all_heights = HEIGHTS,)
                             # deviations = [f'ws_{h}m' for h in HEIGHTS])
 
-    # Remove rows where there isn't enough data
+    if doWeather:
+        df = preprocess.determine_weather(df = df,
+                storm_events = storm_events,
+                weather_data = cid_data,
+                trace_float = CID_TRACE)
+
+    # Remove data where it is too stormy to rely on data
+    df = preprocess.flagged_removal(df = df,
+                                    flags = storm_removal)
+
+    # Remove rows where there isn't enough data (not enough columns, or missing either 10m or 106m data)
     df = preprocess.strip_missing_data(df = df,
                                     necessary = [10, 106],
                                     minimum = 3)
@@ -190,7 +228,9 @@ def compute_values(df,
     return df
 
 def temp_plots(df):
-    import ipplot as plot
+    import finalplots
+    finalplots.generate_plots(df)
+    #import ipplot as plot
     #plot.hist_alpha_by_stability(df, separate = True, compute = True, overlay = True)
     #plot.alpha_tod_violins(df, fit = False)
 
@@ -201,18 +241,48 @@ def temp_plots(df):
     #     plot.alpha_tod_violins(df, season = season, fit = True, saveto = f'{tod_dir}/{season.lower()}.png')
     #     plot.alpha_tod_violins_by_terrain(df, season = season, fit = True, saveto = f'{tod_dir}/{season.lower()}T.png') 
 
-    
-
     #plot.ri_tod_violins(df, fit = False, cut = 25, printcutfrac = True, bounds = (-5,3))
-    ###plot.boom_data_available(df, freq = '10min', heights = HEIGHTS)
+
+    #plot.boom_data_available(df, freq = '10min', heights = HEIGHTS)
+
     #plot.alpha_over_time(df)
     #plot.comparison(df, which = ['alpha', 'alpha_no106'], xlims=(-0.5,1), ylims = (-0.5,1))
     #plot.comparison(df, which = ['alpha', 'alpha_no32'], xlims=(-0.5,1), ylims = (-0.5,1))
+
+
+
     return
 
-def get_storm_events():
-    storms.test()
-    return None
+def get_storm_events(start_time, end_time, radius: int|float = 25., unit: str = 'km'):
+    region = CoordinateRegion(latitude = LATITUDE, longitude = LONGITUDE, radius = radius, unit = unit)
+    results = []
+    for filepath in STORM_FILES:
+        results.append(storms.get_storms(filepath, region))
+    sDf = pd.concat(results)
+    # Checking sDf['CZ_TIMEZONE'] shows that all are localized to CST-6 regardless of DST
+    #   To account for this in our localization we specify GMT-6
+    format_string = "%d-%b-%y %H:%M:%S" # Format can't be inferred so specifying. See strftime documentation.
+    sDf['BEGIN_DATE_TIME'] = pd.to_datetime(sDf['BEGIN_DATE_TIME'], format = format_string).dt.tz_localize('etc/GMT-6').dt.tz_convert(LOCAL_TIMEZONE)
+    sDf['END_DATE_TIME'] = pd.to_datetime(sDf['END_DATE_TIME'], format = format_string).dt.tz_localize('etc/GMT-6').dt.tz_convert(LOCAL_TIMEZONE)
+    sDf = sDf[(sDf['BEGIN_DATE_TIME'] <= end_time) & (sDf['END_DATE_TIME'] >= start_time)]
+    return sDf
+
+def get_weather_data(start_time, end_time):
+    cid = pd.read_csv(CID_DATA_PATH)
+    cid.drop(columns = ['station','dwpc'], inplace = True)
+    cid.rename(columns = {
+        'valid' : 'time',
+        'tmpc' : 't_0m',
+        'relh' : 'rh_0m',
+        'drct' : 'wd_0m',
+        'sped' : 'ws_0m',
+        'mslp' : 'p_0m',
+        'p01m' : 'precip'
+    }, inplace=True)
+    cid['time'] = pd.to_datetime(cid['time']).dt.tz_localize('UTC').dt.tz_convert(LOCAL_TIMEZONE)
+    cid = preprocess.convert_dataframe_units(cid, from_units = CID_UNITS, gravity = LOCAL_GRAVITY, silent = True)
+    cid = cid[(cid['time'] <= end_time) & (cid['time'] >= start_time)].reset_index(drop = True)
+    return cid
 
 if __name__ == '__main__':
     RELOAD = False
@@ -231,7 +301,15 @@ if __name__ == '__main__':
         df = load_data(
             data_directory = f'{PARENTDIR}/data/KCC_SlowData',
             outer_merges = False,
-        )
+        ) # Will return with default (not time) index, which is good for the storm/weather data
+
+        print('Getting storm events')
+        storm_events = get_storm_events(start_time = START_TIME, end_time = END_TIME, radius = 25, unit = 'km')
+
+        print('Getting weather data')
+        cid_data = get_weather_data(start_time = START_TIME, end_time = END_TIME)
+
+        df.set_index('time', inplace=True) # Need time index from here on
 
         df = perform_preprocessing(
             df = df,
@@ -244,6 +322,9 @@ if __name__ == '__main__':
             outlier_window = 30, # Duration, in minutes, of rolling outlier removal window
             outlier_sigma = 5, # Number of standard deviations beyond which to discard outliers in rolling removal
             resampling_window = 10, # Duration, in minutes, of resampling window
+            storm_events = storm_events,
+            weather_data = cid_data,
+            storm_removal = ['hail','storm','heavy_rain'] # When any of these columns are True, discard the data
         )
 
         # Define 3-class bulk Richardson number stability classification scheme
@@ -271,18 +352,31 @@ if __name__ == '__main__':
             stability_classifier = stability_classifier
         )
 
-        storm_events = get_storm_events()
+        df.reset_index(inplace = True)
 
-        save(df, f'{PARENTDIR}/results/output.csv')
+        print('Complete, saving results')
+
+        df.to_csv(f'{PARENTDIR}/results/output.csv', index = False)
+        storm_events.to_csv(f'{PARENTDIR}/results/storms.csv', index = False)
+        cid_data.to_csv(f'{PARENTDIR}/results/cid.csv', index = False)
     else:
         print('RELOAD set to False, will use previous output.')
 
+    print('Loading results')
     df = pd.read_csv(f'{PARENTDIR}/results/output.csv')
     df['time'] = pd.to_datetime(df['time'], utc=True) # will convert to UTC!
     df['time'] = df['time'].dt.tz_convert('US/Central')
-    
-    temp_plots(df)
 
-    print(len(df[df['alpha'] < 0]))
-    print(len(df))
+    storm_events = pd.read_csv(f'{PARENTDIR}/results/storms.csv')
     
+    cid_data = pd.read_csv(f'{PARENTDIR}/results/cid.csv')
+    cid_data['time'] = pd.to_datetime(cid_data['time'], utc=True) # will convert to UTC!
+    cid_data['time'] = cid_data['time'].dt.tz_convert('US/Central')
+
+    print('Results loaded')
+
+    # print(storm_events[['BEGIN_DATE_TIME','EVENT_TYPE']])
+    # print(cid_data)
+    # print(df)
+
+    temp_plots(df)

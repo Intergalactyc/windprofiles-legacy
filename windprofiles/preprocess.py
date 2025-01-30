@@ -4,7 +4,9 @@
 import numpy as np
 import pandas as pd
 import windprofiles.lib.polar as polar
+import windprofiles.lib.atmos as atmos
 import warnings
+from datetime import timedelta
 
 # DO NOT CHANGE STANDARDS WITHOUT ALL CORRESPONDING UPDATES
 _standards = {
@@ -21,17 +23,26 @@ def get_standards():
 def print_standards():
     print(_standards)
 
-def _convert_pressure(series, from_unit):
+def _convert_pressure(series, from_unit, gravity = atmos.STANDARD_GRAVITY):
     """
     Conversion of pressure units
+    If input has format "{unit}_{number}asl", interpreted
+        as sea-level pressure and converted to pressure
+        at height of <number> meters
     """
     if _standards['p'] != 'kPa':
         raise(f'preprocess._convert_pressure: Standardized pressure changed from kPa to {_standards["p"]} unexpectedly')
+    if '_' in from_unit:
+        from_unit, masl = from_unit.split('_')
+        meters_asl = float(masl[:-3])
+        series = atmos.pressure_above_msl(series, meters_asl, gravity = gravity)
     match from_unit:
         case 'kPa':
             return series
         case 'mmHg':
             return series * 0.13332239
+        case 'mBar':
+            return series / 10.
         case _:
             raise(f'preprocess._convert_pressure: Unrecognized pressure unit {from_unit}')
         
@@ -128,7 +139,7 @@ def _convert_direction(series, from_unit):
     else:
         raise(f'preprocess._convert_direction: Unrecognized zero type {type(zero)} for {zero}')
 
-def convert_dataframe_units(df, from_units, silent = False):
+def convert_dataframe_units(df, from_units, gravity = atmos.STANDARD_GRAVITY, silent = False):
     """
     Public function for converting units for all 
     (commonly formatted) columns in dataframe based
@@ -152,8 +163,13 @@ def convert_dataframe_units(df, from_units, silent = False):
             column_type = column.split('_')[0]
             if column_type in conversions_by_type.keys():
                 conversion = conversions_by_type[column_type]
-                result[column] = conversion(series = result[column],
-                                            from_unit = from_units[column_type])
+                if column_type == 'p':
+                    result[column] = conversion(series = result[column],
+                                                from_unit = from_units[column_type],
+                                                gravity = gravity)
+                else:
+                    result[column] = conversion(series = result[column],
+                                                from_unit = from_units[column_type])
 
     if not silent:
         print('preprocess.convert_dataframe_units() - DataFrame unit conversion completed')
@@ -358,6 +374,60 @@ def resample(df: pd.DataFrame,
 def convert_timezone(df: pd.DataFrame, source_timezone: str, target_timezone: str):
     result = df.copy()
     result.index = df.index.tz_localize(source_timezone).tz_convert(target_timezone)
+    return result
+
+def determine_weather(df: pd.DataFrame, storm_events: pd.DataFrame, weather_data: pd.DataFrame, trace_float: float = 0.) -> pd.DataFrame:
+    HOUR = timedelta(hours = 1)
+    # mark times inclusively between storm event start and end times as either hail = True or storm = True
+    result = df.copy()
+    all_storms = list(storm_events.apply(lambda row : (row['BEGIN_DATE_TIME'], row['END_DATE_TIME'], row['EVENT_TYPE']), axis = 1))
+    result['hail'] = False
+    result['storm'] = False
+    result['heavy_rain'] = False
+    result['light_rain'] = False
+    for start, end, storm_type in all_storms:
+        if start == end:
+            end += HOUR
+        if storm_type == 'Hail':
+            result.loc[(result.index >= start) & (result.index <= end), 'hail'] = True
+        elif storm_type.lower() == 'Flash Flood':
+            result.loc[(result.index >= start) & (result.index <= end), ['light_rain','heavy_rain']] = True
+        else:
+            result.loc[(result.index >= start) & (result.index <= end), 'storm'] = True
+    # mark times where precipitation is above trace value as rain = True
+        # for each time stamp in the CID data where it is raining, mark df time stamps between the previous timestamp and now as raining
+    for index, row in weather_data.iterrows(): # I know this is slower than optimal but there isn't THAT much data and it works fine
+        precip = row['precip']
+        if precip > trace_float and index > 0: # not really handling the case where index is 0 but we know it's not raining at the start anyway
+            start = row['time'] - HOUR
+            end = row['time']
+            selector = 'light_rain' if precip < 5 else ['light_rain','heavy_rain']
+            result.loc[(result.index >= start) & (result.index <= end), selector] = True
+    return result
+
+def flagged_removal(df: pd.DataFrame, flags: str|list[str], silent: bool = False, drop_cols = True):
+    """
+    For each column listed in `flags`, remove rows from `df` where that column is True
+    """
+    if not silent:
+        print(f'preprocess.flagged_removal() - beginning removals based on column(s) {flags}')
+
+    original_size = len(df)
+    result = df.copy()
+
+    if type(flags) is str:
+        flags = [flags]
+
+    for flag in flags:
+        print(result[flag])
+        result.drop(result[result[flag] == True].index, inplace = True)
+
+    result.drop(columns = flags, inplace = True)
+
+    if not silent:
+        removals = original_size - len(result)
+        print(f'\tRemovals complete ({removals} rows dropped, {len(result)} rows remain)')
+
     return result
 
 def strip_missing_data(df: pd.DataFrame, necessary: list[int], minimum: int = 4, silent: bool = False):

@@ -295,6 +295,14 @@ def alpha_over_time(df: pd.DataFrame):
     plt.tight_layout()
     plt.show()
 
+def alpha_with_storms(df: pd.DataFrame, storms: pd.DataFrame):
+    plt.scatter(df['time'], df['alpha'], s = 1)
+    plt.xlabel(f'Time')
+    plt.ylabel(r'$\alpha$')
+    plt.title(r'WSE $\alpha$ over time')
+    plt.tight_layout()
+    plt.show()
+
 def comparison(df: pd.DataFrame, which: list[str], id = False, xlims = None, ylims = None):
     a, b = which
     plt.scatter(df[a], df[b], s=0.2)
@@ -307,13 +315,9 @@ def comparison(df: pd.DataFrame, which: list[str], id = False, xlims = None, yli
     plt.ylabel(b)
     plt.show()
 
-"""
 def boom_data_available(df, heights, *, freq = '10min'):
-    print('a')
     alltimes = pd.date_range(df['time'].min(), df['time'].max(), freq=freq).to_series()
-    print('b')
     for i, height in enumerate(heights):
-        print(i)
         availableData = df.apply(lambda row : height * int(not pd.isna(row[f'ws_{height}m'])), axis = 1)
         unavailableData = availableData.apply(lambda row : height - row)
         availableData[availableData == 0] = np.nan
@@ -324,11 +328,9 @@ def boom_data_available(df, heights, *, freq = '10min'):
         else:
             plt.scatter(df['time'], availableData, s=4, c='blue')
             plt.scatter(df['time'], unavailableData, s=4, c='red')
-    print('c')
     print(np.array(alltimes.values))
     print(np.array(df['time']))
     fullgaps = alltimes.apply(lambda row : int(row.value not in df['time']))
-    print('d')
     fullgaps[fullgaps == 0] = np.nan
     plt.scatter(alltimes, fullgaps, s=4, c='green', label = 'nowhere available')
     plt.title('Data availability/gaps')
@@ -337,6 +339,5 @@ def boom_data_available(df, heights, *, freq = '10min'):
     plt.legend()
     plt.show()
     return
-"""
     
 # TIME HAS TO BE PASSED IN AS LOCAL TIME AND THEN SPECIFY LOCAL=TRUE ATM
