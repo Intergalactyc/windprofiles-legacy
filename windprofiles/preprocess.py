@@ -402,8 +402,11 @@ def determine_weather(df: pd.DataFrame, storm_events: pd.DataFrame, weather_data
         if precip > trace_float and index > 0: # not really handling the case where index is 0 but we know it's not raining at the start anyway
             start = row['time'] - HOUR
             end = row['time']
-            selector = 'light_rain' if precip < 5 else 'heavy_rain'
-            result.loc[(result.index >= start) & (result.index <= end), selector] = True
+            if precip < 5:
+                result.loc[(result.index >= start) & (result.index <= end), 'light_rain'] = True
+            else:
+                result.loc[(result.index >= start) & (result.index <= end), 'light_rain'] = False
+                result.loc[(result.index >= start) & (result.index <= end), 'heavy_rain'] = True
     return result
 
 def flagged_removal(df: pd.DataFrame, flags: str|list[str], silent: bool = False, drop_cols = True):

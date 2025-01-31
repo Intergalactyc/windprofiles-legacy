@@ -230,11 +230,11 @@ def compute_values(df,
 
     return df
 
-def temp_plots(df):
+def temp_plots(df: pd.DataFrame, cid: pd.DataFrame):
     import finalplots
-    finalplots.generate_plots(df)
+    finalplots.generate_plots(df, cid)
     import ipplot
-    ipplot.generate_plots(df)
+    ipplot.generate_plots(df, cid)
     #plot.hist_alpha_by_stability(df, separate = True, compute = True, overlay = True)
     #plot.alpha_tod_violins(df, fit = False)
 
@@ -379,4 +379,4 @@ if __name__ == '__main__':
 
     print('Results loaded')
 
-    temp_plots(df)
+    temp_plots(df = df, cid = cid_data)

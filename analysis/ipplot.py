@@ -375,9 +375,14 @@ def overlay_storms(df, ax):
 def print_storm_amounts(df: pd.DataFrame):
     N_total = len(df)
     print(f"Total dataframe length: {N_total} rows")
-    for stype in ["hail", "storm", "light_rain", "heavy_rain"]:
+    STORMS =["hail", "storm", "light_rain", "heavy_rain"]
+    for stype in STORMS:
         N_storm = len(df[df[stype]])
         print(f"{stype}: {N_storm} rows ({100*N_storm/N_total:.2f}%)")
+    N_any = len(df[df["hail"] | df["storm"] | df["light_rain"] | df["heavy_rain"]])
+    N_hypo = len(df[df["hail"] | df["storm"] | df["heavy_rain"]])
+    print(f"Total of {N_any} rows ({100*N_any/N_total:.2f}%) with some form of weather event.")
+    print(f"Hail+storm+heavy rain eliminations would remove {N_hypo} rows ({100*N_hypo/N_total:.2f}%)")
 
 def raw_data_with_storms(df: pd.DataFrame):
     fig, ax = plt.subplots(figsize = (10,6))
@@ -388,10 +393,23 @@ def raw_data_with_storms(df: pd.DataFrame):
     ax.add_artist(legend)
     overlay_storms(df, ax)
     ax.set_title("Wind speeds, with storms overlaid")
+    ax.set_ylabel("Wind speed, m/s")
+    ax.set_xlabel("Timestamp (US/Central)")
     ax2 = ax.twinx()
-    ax2.scatter(df['time'], df['alpha'], s = 2, label = r"$\alpha$")
+    ax2.scatter(df['time'], df['alpha'], s = 1, label = r"$\alpha$")
+    ax2.legend(loc = "upper center")
+    ax2.set_ylabel("Wind shear exponet")
     plt.show()
 
-def generate_plots(df: pd.DataFrame):
-    print_storm_amounts(df)
-    raw_data_with_storms(df)
+def compare_temperature(df: pd.DataFrame, cid: pd.DataFrame):
+    df_merged = pd.merge_asof(df, cid, on="time", direction="nearest")
+    plt.scatter(df_merged['t_6m'], df_merged['t_0m'], s=2)
+    plt.title('Temperature comparison (temperatures in K)')
+    plt.ylabel('CID data')
+    plt.xlabel('KCC met tower data, 6m')
+    plt.show()
+
+def generate_plots(df: pd.DataFrame, cid: pd.DataFrame):
+    #print_storm_amounts(df)
+    #raw_data_with_storms(df)
+    compare_temperature(df, cid)

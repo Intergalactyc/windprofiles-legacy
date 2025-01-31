@@ -2,5 +2,5 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 
-def generate_plots(df: pd.DataFrame):
+def generate_plots(df: pd.DataFrame, cid: pd.DataFrame):
     pass
