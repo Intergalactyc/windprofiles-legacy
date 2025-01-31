@@ -120,10 +120,10 @@ def perform_preprocessing(df,
                           resampling_window,
                           storm_events = None,
                           weather_data = None,
-                          storm_removal = None):
+                          storm_removal = False):
     print("START DATA PREPROCESSING")
     
-    doWeather = not(storm_events is None or weather_data is None or storm_removal is None)
+    doWeather = not(storm_events is None or weather_data is None)
 
     # Automatically convert units of all columns to standards as outlined in convert.py
     df = preprocess.convert_dataframe_units(df = df, from_units = SOURCE_UNITS, gravity = LOCAL_GRAVITY)
@@ -167,20 +167,23 @@ def perform_preprocessing(df,
                             all_heights = HEIGHTS,)
                             # deviations = [f'ws_{h}m' for h in HEIGHTS])
 
-    if doWeather:
-        df = preprocess.determine_weather(df = df,
-                storm_events = storm_events,
-                weather_data = cid_data,
-                trace_float = CID_TRACE)
-
-    # Remove data where it is too stormy to rely on data
-    df = preprocess.flagged_removal(df = df,
-                                    flags = storm_removal)
-
     # Remove rows where there isn't enough data (not enough columns, or missing either 10m or 106m data)
     df = preprocess.strip_missing_data(df = df,
                                     necessary = [10, 106],
                                     minimum = 3)
+    
+    if doWeather:
+        print('Matching reported weather events...')
+        # Determine where it is rainy/hailing/stormy
+        df = preprocess.determine_weather(df = df,
+                    storm_events = storm_events,
+                    weather_data = cid_data,
+                    trace_float = CID_TRACE)
+
+        if storm_removal:
+            # Remove data where it is too stormy to rely on data
+            df = preprocess.flagged_removal(df = df,
+                                            flags = ['hail','storm','heavy_rain'])
 
     print("END DATA PREPROCESSING")
 
@@ -230,7 +233,8 @@ def compute_values(df,
 def temp_plots(df):
     import finalplots
     finalplots.generate_plots(df)
-    #import ipplot as plot
+    import ipplot
+    ipplot.generate_plots(df)
     #plot.hist_alpha_by_stability(df, separate = True, compute = True, overlay = True)
     #plot.alpha_tod_violins(df, fit = False)
 
@@ -324,7 +328,7 @@ if __name__ == '__main__':
             resampling_window = 10, # Duration, in minutes, of resampling window
             storm_events = storm_events,
             weather_data = cid_data,
-            storm_removal = ['hail','storm','heavy_rain'] # When any of these columns are True, discard the data
+            storm_removal = False # discard stormy data?
         )
 
         # Define 3-class bulk Richardson number stability classification scheme
@@ -374,9 +378,5 @@ if __name__ == '__main__':
     cid_data['time'] = cid_data['time'].dt.tz_convert('US/Central')
 
     print('Results loaded')
-
-    # print(storm_events[['BEGIN_DATE_TIME','EVENT_TYPE']])
-    # print(cid_data)
-    # print(df)
 
     temp_plots(df)

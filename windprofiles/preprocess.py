@@ -387,11 +387,12 @@ def determine_weather(df: pd.DataFrame, storm_events: pd.DataFrame, weather_data
     result['light_rain'] = False
     for start, end, storm_type in all_storms:
         if start == end:
-            end += HOUR
+            start -= 1.5 * HOUR
+            end += 1.5 * HOUR
         if storm_type == 'Hail':
             result.loc[(result.index >= start) & (result.index <= end), 'hail'] = True
         elif storm_type.lower() == 'Flash Flood':
-            result.loc[(result.index >= start) & (result.index <= end), ['light_rain','heavy_rain']] = True
+            result.loc[(result.index >= start) & (result.index <= end), 'heavy_rain'] = True
         else:
             result.loc[(result.index >= start) & (result.index <= end), 'storm'] = True
     # mark times where precipitation is above trace value as rain = True
@@ -401,7 +402,7 @@ def determine_weather(df: pd.DataFrame, storm_events: pd.DataFrame, weather_data
         if precip > trace_float and index > 0: # not really handling the case where index is 0 but we know it's not raining at the start anyway
             start = row['time'] - HOUR
             end = row['time']
-            selector = 'light_rain' if precip < 5 else ['light_rain','heavy_rain']
+            selector = 'light_rain' if precip < 5 else 'heavy_rain'
             result.loc[(result.index >= start) & (result.index <= end), selector] = True
     return result
 
