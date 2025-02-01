@@ -396,9 +396,10 @@ def raw_data_with_storms(df: pd.DataFrame):
     ax.set_ylabel("Wind speed, m/s")
     ax.set_xlabel("Timestamp (US/Central)")
     ax2 = ax.twinx()
+    ax2.plot(df['time'], df['rh_10m'], linewidth = 1, c = 'pink')
     ax2.scatter(df['time'], df['alpha'], s = 1, label = r"$\alpha$")
     ax2.legend(loc = "upper center")
-    ax2.set_ylabel("Wind shear exponet")
+    ax2.set_ylabel("Wind shear exponent")
     plt.show()
 
 def compare_temperature(df: pd.DataFrame, cid: pd.DataFrame):
@@ -411,5 +412,5 @@ def compare_temperature(df: pd.DataFrame, cid: pd.DataFrame):
 
 def generate_plots(df: pd.DataFrame, cid: pd.DataFrame):
     #print_storm_amounts(df)
-    #raw_data_with_storms(df)
+    raw_data_with_storms(df)
     compare_temperature(df, cid)
