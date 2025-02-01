@@ -5,7 +5,21 @@ from windprofiles.lib.polar import wind_components
 STANDARD_GRAVITY = 9.80665 # standard gravitational parameter g in m/s^2
 REFERENCE_PRESSURE = 100. # reference pressure in kPa
 WATER_AIR_MWR = 0.622 # water:air molecular weight ratio
-R_CP = 0.286 # gas constant of air divided by specific heat capacity at constant pressure 
+R = 8.314462618/0.02896968 # gas constant of air, equal to universal gas constant divided by molar mass of dry air; result in J/(kg*K)
+CP = 1004.68506 # specific heat capacity of air at constant pressure, J/(kg*K)
+R_CP = R/CP # ~ 0.286
+T0 = 288.15 # Sea level standard temperature, K
+
+def pressure_above_msl(value, meters_asl, gravity = STANDARD_GRAVITY):
+    """
+    Given value of pressure at sea level and height above
+        sea level (in meters), as well as optionally a value
+        for local gravitational acceleration, returns
+        the local value of barometric pressure
+    """
+    exponent = 1/R_CP
+    coefficient = (1 - ((gravity * meters_asl) / (CP * T0)))
+    return value * (coefficient ** exponent)
 
 def saturation_vapor_pressure(temperature, method = 'tetens'):
     """

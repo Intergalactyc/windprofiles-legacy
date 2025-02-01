@@ -4,8 +4,7 @@ import windprofiles.lib.atmos as atmos
 import windprofiles.lib.stats as stats
 from windprofiles.classify import TerrainClassifier, PolarClassifier, StabilityClassifier, SingleClassifier
 from warnings import warn
-
-STANDARD_GRAVITY = 9.80665 # standard gravitational parameter g in m/s^2
+from windprofiles.lib.atmos import STANDARD_GRAVITY
 
 def strip_failures(df: pd.DataFrame, subset: list[str], silent: bool = False):
     if not silent:

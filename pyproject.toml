@@ -22,7 +22,8 @@ dependencies = [
     "pandas",
     "tqdm",
     "scipy",
-    "windrose"
+    "windrose",
+    "geopy"
 ]
 
 [project.urls]

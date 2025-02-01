@@ -8,6 +8,65 @@ from warnings import warn
 from abc import ABC, abstractmethod
 from windprofiles.lib.polar import angular_distance
 from numbers import Number
+import geopy.distance as gdist
+
+class CoordinateRegion:
+    """
+    Pseudoclassifier class that can be used to determine whether a """
+    def __init__(self, latitude: float, longitude: float, radius: float, unit: str = 'meters'):
+        """
+        Arguments should be in degrees
+        Pass either a single value for radius or a latitude,
+            longitude tuple pair (order is important)
+        """
+        # Would like to add in ability to use distance radius rather than just angular
+        if unit not in ['km', 'm', 'kilometers', 'meters', 'mi', 'miles']:
+            raise(f"Unit {unit} not recognized")
+        self._unit = unit
+        self._lat = latitude
+        self._long = longitude
+        self._radius = radius
+
+    def _convertDistance(self, distance):
+        match self._unit:
+            case 'km':
+                return distance.km
+            case 'm':
+                return distance.m
+            case 'mi':
+                return distance.mi
+            case 'kilometers':
+                return distance.km
+            case 'meters':
+                return distance.m
+            case 'miles':
+                return distance.mi
+            case _:
+                raise(f'Failure in distance conversion for distance {distance} and unit {self._unit}')
+
+    def classify(self, latitude, longitude):
+        """
+        Classify a latitude-longitude pair as either in the region (True)
+            or outside of it (False)
+        """
+        if math.isnan(latitude) or math.isnan(longitude):
+            return False
+        dist_raw = gdist.geodesic((latitude, longitude),(self._lat, self._long))
+        dist = self._convertDistance(dist_raw)
+        return dist < self._radius
+
+    def classify_line(self, begin_lat, begin_long, end_lat, end_long):
+        to_check = [(begin_lat, begin_long), (end_lat, end_long)]
+        while gdist.geodesic(to_check[0], to_check[1]) > self.radius:
+            pass
+
+# class CountyRegion:
+#     def __init__(self, counties: list[str], state: str):
+#         pass
+#     # DO THIS LATER
+#     # Cedar Rapids county: Linn
+#     # Nearest counties in Iowa: Benton, Iowa, Johnson
+#     # Other counties in Iowa bordering Linn: Cedar, Jones, Delaware, Buchanan, Black Hawk
 
 class _TemplateClassifier(ABC):
     """

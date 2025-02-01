@@ -1,6 +1,6 @@
 import pandas as pd
 import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
+from matplotlib.patches import Patch
 import numpy as np
 import scipy.stats as spstats
 import windprofiles.lib.stats as stats
@@ -219,7 +219,7 @@ def alpha_tod_violins_by_terrain(df, season = None, local = True, wrap0 = True, 
 
     fig.suptitle(f'WSE Median and Distribution by Time of Day ({s_text})')
 
-    labels = [(mpatches.Patch(color=color), tc) for tc, color in colors.items()]
+    labels = [(Patch(color=color), tc) for tc, color in colors.items()]
     ax.legend(*zip(*labels), loc=2)
 
     fig.tight_layout()
@@ -295,6 +295,14 @@ def alpha_over_time(df: pd.DataFrame):
     plt.tight_layout()
     plt.show()
 
+def alpha_with_storms(df: pd.DataFrame, storms: pd.DataFrame):
+    plt.scatter(df['time'], df['alpha'], s = 1)
+    plt.xlabel(f'Time')
+    plt.ylabel(r'$\alpha$')
+    plt.title(r'WSE $\alpha$ over time')
+    plt.tight_layout()
+    plt.show()
+
 def comparison(df: pd.DataFrame, which: list[str], id = False, xlims = None, ylims = None):
     a, b = which
     plt.scatter(df[a], df[b], s=0.2)
@@ -307,13 +315,9 @@ def comparison(df: pd.DataFrame, which: list[str], id = False, xlims = None, yli
     plt.ylabel(b)
     plt.show()
 
-"""
 def boom_data_available(df, heights, *, freq = '10min'):
-    print('a')
     alltimes = pd.date_range(df['time'].min(), df['time'].max(), freq=freq).to_series()
-    print('b')
     for i, height in enumerate(heights):
-        print(i)
         availableData = df.apply(lambda row : height * int(not pd.isna(row[f'ws_{height}m'])), axis = 1)
         unavailableData = availableData.apply(lambda row : height - row)
         availableData[availableData == 0] = np.nan
@@ -324,11 +328,9 @@ def boom_data_available(df, heights, *, freq = '10min'):
         else:
             plt.scatter(df['time'], availableData, s=4, c='blue')
             plt.scatter(df['time'], unavailableData, s=4, c='red')
-    print('c')
     print(np.array(alltimes.values))
     print(np.array(df['time']))
     fullgaps = alltimes.apply(lambda row : int(row.value not in df['time']))
-    print('d')
     fullgaps[fullgaps == 0] = np.nan
     plt.scatter(alltimes, fullgaps, s=4, c='green', label = 'nowhere available')
     plt.title('Data availability/gaps')
@@ -337,6 +339,78 @@ def boom_data_available(df, heights, *, freq = '10min'):
     plt.legend()
     plt.show()
     return
-"""
     
 # TIME HAS TO BE PASSED IN AS LOCAL TIME AND THEN SPECIFY LOCAL=TRUE ATM
+
+def overlay_storms(df, ax):
+    STORM_STYLES = {
+        "hail": {"color": "blue", "hatch": "//", "name": "Hail"},         # Diagonal blue stripes
+        "light_rain": {"color": "green", "hatch": "\\", "name": "Light Rain"},  # Backward diagonal green
+        "heavy_rain": {"color": "red", "hatch": "xx", "name": "Heavy Rain"},    # Cross-hatch red
+        "storm": {"color": "purple", "hatch": "--", "name": "Storm"}       # Horizontal dashes purple
+    }
+
+    for i in range(len(df['time']) - 1):
+        for storm, style in STORM_STYLES.items():
+            if df[storm].iloc[i]:
+                ax.axvspan(
+                    df['time'].iloc[i], df['time'].iloc[i+1], 
+                    facecolor=style["color"],
+                    alpha=0.2,
+                    hatch=style["hatch"],
+                    edgecolor=style["color"],
+                    linewidth = 0
+                )
+
+    legend_patches = [
+        Patch(facecolor=style["color"], hatch=style["hatch"], label=style["name"], edgecolor="black", linewidth=1)
+        for style in STORM_STYLES.values()
+    ]
+
+    legend = plt.legend(handles=legend_patches, loc="upper left")
+    ax.add_artist(legend)
+
+    return
+
+def print_storm_amounts(df: pd.DataFrame):
+    N_total = len(df)
+    print(f"Total dataframe length: {N_total} rows")
+    STORMS =["hail", "storm", "light_rain", "heavy_rain"]
+    for stype in STORMS:
+        N_storm = len(df[df[stype]])
+        print(f"{stype}: {N_storm} rows ({100*N_storm/N_total:.2f}%)")
+    N_any = len(df[df["hail"] | df["storm"] | df["light_rain"] | df["heavy_rain"]])
+    N_hypo = len(df[df["hail"] | df["storm"] | df["heavy_rain"]])
+    print(f"Total of {N_any} rows ({100*N_any/N_total:.2f}%) with some form of weather event.")
+    print(f"Hail+storm+heavy rain eliminations would remove {N_hypo} rows ({100*N_hypo/N_total:.2f}%)")
+
+def raw_data_with_storms(df: pd.DataFrame):
+    fig, ax = plt.subplots(figsize = (10,6))
+    lines = []
+    for h in HEIGHTS:
+        lines.append(*ax.plot(df['time'], df[f'ws_{h}m'], linewidth = 0.5, label = f"{h} meters"))
+    legend = plt.legend(handles=lines, loc="upper right")
+    ax.add_artist(legend)
+    overlay_storms(df, ax)
+    ax.set_title("Wind speeds, with storms overlaid")
+    ax.set_ylabel("Wind speed, m/s")
+    ax.set_xlabel("Timestamp (US/Central)")
+    ax2 = ax.twinx()
+    ax2.plot(df['time'], df['rh_10m'], linewidth = 1, c = 'pink')
+    ax2.scatter(df['time'], df['alpha'], s = 1, label = r"$\alpha$")
+    ax2.legend(loc = "upper center")
+    ax2.set_ylabel("Wind shear exponent")
+    plt.show()
+
+def compare_temperature(df: pd.DataFrame, cid: pd.DataFrame):
+    df_merged = pd.merge_asof(df, cid, on="time", direction="nearest")
+    plt.scatter(df_merged['t_6m'], df_merged['t_0m'], s=2)
+    plt.title('Temperature comparison (temperatures in K)')
+    plt.ylabel('CID data')
+    plt.xlabel('KCC met tower data, 6m')
+    plt.show()
+
+def generate_plots(df: pd.DataFrame, cid: pd.DataFrame):
+    #print_storm_amounts(df)
+    raw_data_with_storms(df)
+    compare_temperature(df, cid)
