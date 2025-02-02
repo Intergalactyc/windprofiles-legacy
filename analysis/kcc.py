@@ -13,7 +13,7 @@ from kcc_definitions import *
 PARENTDIR = 'C:/Users/22wal/OneDrive/GLWind' # If you are not Elliott and this is not the path for you then pass argument -p followed by the correct path when running!
 
 RULES = {
-    'shadowing_width' : 30,
+    'shadowing_width_degrees' : 30,
     'storm_radius_km' : 25,
     'storm_removal' : False,
     'default_removals' : True,
@@ -24,6 +24,9 @@ RULES = {
     'terrain_window_width_degrees' : 60,
     'terrain_wind_height_meters' : 10
 }
+
+FIGURE_SUPTITLES = False
+FIGURE_FONTSIZE = 14
 
 def load_data(data_directory: str, outer_merges: bool = False):
     print('START DATA LOADING')
@@ -203,7 +206,7 @@ def compute_values(df,
     return df
 
 def generate_plots(df: pd.DataFrame, cid: pd.DataFrame, savedir: str, summary: dict):
-    finalplots.generate_plots(df = df, cid = cid, savedir = savedir, summary = summary)
+    finalplots.generate_plots(df = df, cid = cid, savedir = savedir, summary = summary, suptitles = FIGURE_SUPTITLES, fontsize = FIGURE_FONTSIZE)
 
 def get_storm_events(start_time, end_time, radius: int|float = 25., unit: str = 'km'):
     region = CoordinateRegion(latitude = LATITUDE, longitude = LONGITUDE, radius = radius, unit = unit)
@@ -317,7 +320,7 @@ if __name__ == '__main__':
 
         df = perform_preprocessing(
             df = df,
-            shadowing_width = RULES['shadowing_width'], # width, in degrees, of shadowing bins
+            shadowing_width = RULES['shadowing_width_degrees'], # width, in degrees, of shadowing bins
             removal_periods = {
                 ('2018-03-05 13:20:00','2018-03-10 00:00:00') : 'ALL', # large maintenance gap
                 ('2018-04-18 17:40:00','2018-04-19 14:20:00') : [106], # small maintenance-shaped gap
