@@ -1,3 +1,5 @@
+# Currently non functional
+
 import matplotlib.pyplot as plt
 
 # iteration: monthly/seasonally, stability, terrain

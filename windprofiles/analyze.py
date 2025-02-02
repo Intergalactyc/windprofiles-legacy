@@ -15,4 +15,4 @@ def save(object, saveto, **kwargs): # UNTESTED; may replace with either separate
     elif object == 'PLOT':
         plt.savefig(saveto)
     else:
-        raise('analyze.save: Unrecognized object type to save')
+        raise Exception('analyze.save: Unrecognized object type to save')

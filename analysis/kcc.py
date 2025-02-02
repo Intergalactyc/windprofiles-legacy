@@ -4,54 +4,26 @@ import windprofiles.preprocess as preprocess
 import windprofiles.compute as compute
 import windprofiles.storms as storms
 from windprofiles.classify import TerrainClassifier, StabilityClassifier, CoordinateRegion
-from windprofiles.analyze import save
+import finalplots
+import json
 import sys
 import os
+from kcc_definitions import *
 
-# Timezones (source: data, local: local timezone of collection location)
-SOURCE_TIMEZONE = 'UTC'
-LOCAL_TIMEZONE = 'US/Central'
+PARENTDIR = 'C:/Users/22wal/OneDrive/GLWind' # If you are not Elliott and this is not the path for you then pass argument -p followed by the correct path when running!
 
-# Start and end times of data (for storm and precipitation matching)
-START_TIME = pd.to_datetime('2017-09-21 19:00:00-05:00')
-END_TIME = pd.to_datetime('2018-08-29 00:30:00-05:00')
-
-# Local gravity at Cedar Rapids (latitude ~ 42 degrees, elevation ~ 247 m), in m/s^2
-LOCAL_GRAVITY = 9.802
-
-# Latitude and longitude of KCC met tower, each in degrees
-LATITUDE = 41.91
-LONGITUDE = -91.65
-ELEVATION_METERS = 247
-
-SOURCE_UNITS = {
-        'p' : 'mmHg',
-        't' : 'C',
-        'rh' : '%',
-        'ws' : 'm/s',
-        'wd' : ['degrees', 'E', 'CW'],
+RULES = {
+    'shadowing_width' : 30,
+    'storm_radius_km' : 25,
+    'storm_removal' : False,
+    'default_removals' : True,
+    'outlier_window_minutes' : 30,
+    'outlier_sigma' : 5,
+    'resampling_window_minutes' : 10,
+    'stability_classes' : 4,
+    'terrain_window_width_degrees' : 60,
+    'terrain_wind_height_meters' : 10
 }
-
-# All heights (in m) that data exists at
-# Data columns will (and must) follow '{type}_{height}m' format
-HEIGHTS = [6, 10, 20, 32, 80, 106]
-
-STORM_FILES = [
-    "C:/Users/22wal/OneDrive/GLWind/data/StormEvents/StormEvents_details-ftp_v1.0_d2017_c20250122.csv",
-    "C:/Users/22wal/OneDrive/GLWind/data/StormEvents/StormEvents_details-ftp_v1.0_d2018_c20240716.csv"
-]
-
-CID_DATA_PATH = "C:/Users/22wal/OneDrive/GLWind/data/CID/CID_Sep012017_Aug312018.csv"
-
-CID_UNITS = {
-        'p' : f'mBar_{ELEVATION_METERS}asl',
-        't' : 'C',
-        'rh' : '%',
-        'ws' : 'mph',
-        'wd' : ['degrees', 'N', 'CW'],
-}
-
-CID_TRACE = 0.0001
 
 def load_data(data_directory: str, outer_merges: bool = False):
     print('START DATA LOADING')
@@ -230,32 +202,8 @@ def compute_values(df,
 
     return df
 
-def temp_plots(df: pd.DataFrame, cid: pd.DataFrame):
-    import finalplots
-    finalplots.generate_plots(df, cid)
-    import ipplot
-    ipplot.generate_plots(df, cid)
-    #plot.hist_alpha_by_stability(df, separate = True, compute = True, overlay = True)
-    #plot.alpha_tod_violins(df, fit = False)
-
-    # tod_dir = 'C:/Users/22wal/OneDrive/Pictures/temp/tods_wider'
-    # plot.alpha_tod_violins(df, fit = True, saveto = f'{tod_dir}/year.png')
-    # plot.alpha_tod_violins_by_terrain(df, fit = True, saveto = f'{tod_dir}/yearT.png')
-    # for season in ['Fall', 'Winter', 'Spring', 'Summer']:
-    #     plot.alpha_tod_violins(df, season = season, fit = True, saveto = f'{tod_dir}/{season.lower()}.png')
-    #     plot.alpha_tod_violins_by_terrain(df, season = season, fit = True, saveto = f'{tod_dir}/{season.lower()}T.png') 
-
-    #plot.ri_tod_violins(df, fit = False, cut = 25, printcutfrac = True, bounds = (-5,3))
-
-    #plot.boom_data_available(df, freq = '10min', heights = HEIGHTS)
-
-    #plot.alpha_over_time(df)
-    #plot.comparison(df, which = ['alpha', 'alpha_no106'], xlims=(-0.5,1), ylims = (-0.5,1))
-    #plot.comparison(df, which = ['alpha', 'alpha_no32'], xlims=(-0.5,1), ylims = (-0.5,1))
-
-
-
-    return
+def generate_plots(df: pd.DataFrame, cid: pd.DataFrame, savedir: str, summary: dict):
+    finalplots.generate_plots(df = df, cid = cid, savedir = savedir, summary = summary)
 
 def get_storm_events(start_time, end_time, radius: int|float = 25., unit: str = 'km'):
     region = CoordinateRegion(latitude = LATITUDE, longitude = LONGITUDE, radius = radius, unit = unit)
@@ -288,17 +236,69 @@ def get_weather_data(start_time, end_time):
     cid = cid[(cid['time'] <= end_time) & (cid['time'] >= start_time)].reset_index(drop = True)
     return cid
 
+def dataframe_checksum(df: pd.DataFrame, verbose: bool = False) -> int:
+    result = int(pd.util.hash_pandas_object(df).sum())
+    if verbose:
+        print(result)
+        print(f'(type: {type(result)})')
+    return result
+
+def save_results(df: pd.DataFrame, storm_events: pd.DataFrame, cid_data: pd.DataFrame, rules: dict, savedir: str):
+    print(f'Saving results to directory {savedir}')
+
+    summary = rules
+    print('Computing validation checksums for summary file')
+    summary['_df_chksum'] = dataframe_checksum(df)
+    summary['_storm_chksum'] = dataframe_checksum(storm_events)
+    summary['_cid_chksum'] = dataframe_checksum(cid_data)
+    with open(f'{savedir}/summary.json', 'w') as f:
+        json.dump(summary, f)
+    print('Saved summary JSON')
+
+    df.to_csv(f'{savedir}/output.csv')
+    df.to_parquet(f'{savedir}/output.parquet')
+    print("Saved main 'output' dataframe as CSV and Parquet")
+
+    storm_events.to_csv(f'{savedir}/storms.csv')
+    storm_events.to_parquet(f'{savedir}/storms.parquet')
+    print("Saved 'storms' dataframe as CSV and Parquet")
+
+    cid_data.to_csv(f'{savedir}/cid.csv')
+    cid_data.to_parquet(f'{savedir}/cid.parquet')
+    print("Saved 'cid' dataframe as CSV and Parquet")
+
+def load_results(path: str):
+
+    df = pd.read_parquet(f'{path}/output.parquet')
+    storm_events = pd.read_parquet(f'{path}/storms.parquet')
+    cid_data = pd.read_parquet(f'{path}/cid.parquet')
+
+    with open(f'{path}/summary.json', 'r') as f:
+        summary = json.load(f)
+
+    return df, storm_events, cid_data, summary
+
+def validate_summary(summary: dict, df: pd.DataFrame, storm_events: pd.DataFrame, cid_data: pd.DataFrame):
+    sums = {
+        '_df_chksum' : dataframe_checksum(df),
+        '_storm_chksum' : dataframe_checksum(storm_events),
+        '_cid_chksum' : dataframe_checksum(cid_data)
+    }
+    for name, sum in sums.items():
+        if summary[name] != sum:
+            print(f'* Invalid checksum {name}')
+            return False
+    return True
+
 if __name__ == '__main__':
     RELOAD = False
-    PARENTDIR = 'C:/Users/22wal/OneDrive/GLWind' # If you are not Elliott and this is not the path for you then pass argument -p followed by the correct path when running!
-
     if len(sys.argv) > 1:
         if '-r' in sys.argv:
             RELOAD = True
         if '-p' in sys.argv:
             p_index = sys.argv.index('-p')
             if p_index == len(sys.argv) - 1:
-                raise('Must follow -p flag with path to parent directory (directory containing /data/), in UNIX format without any quotation marks')
+                raise Exception('Must follow -p flag with path to parent directory (directory containing /data/), in UNIX format without any quotation marks')
             PARENTDIR = sys.argv[p_index + 1]
     
     if RELOAD:
@@ -308,7 +308,7 @@ if __name__ == '__main__':
         ) # Will return with default (not time) index, which is good for the storm/weather data
 
         print('Getting storm events')
-        storm_events = get_storm_events(start_time = START_TIME, end_time = END_TIME, radius = 25, unit = 'km')
+        storm_events = get_storm_events(start_time = START_TIME, end_time = END_TIME, radius = RULES['storm_radius_km'], unit = 'km')
 
         print('Getting weather data')
         cid_data = get_weather_data(start_time = START_TIME, end_time = END_TIME)
@@ -317,37 +317,50 @@ if __name__ == '__main__':
 
         df = perform_preprocessing(
             df = df,
-            shadowing_width = 30, # width, in degrees, of shadowing bins
+            shadowing_width = RULES['shadowing_width'], # width, in degrees, of shadowing bins
             removal_periods = {
                 ('2018-03-05 13:20:00','2018-03-10 00:00:00') : 'ALL', # large maintenance gap
                 ('2018-04-18 17:40:00','2018-04-19 14:20:00') : [106], # small maintenance-shaped gap
                 ('2018-09-10 12:00:00','2018-09-20 12:00:00') : 'ALL' # blip at end
-            },
-            outlier_window = 30, # Duration, in minutes, of rolling outlier removal window
-            outlier_sigma = 5, # Number of standard deviations beyond which to discard outliers in rolling removal
-            resampling_window = 10, # Duration, in minutes, of resampling window
+            } if RULES['default_removals'] else None,
+            outlier_window = RULES['outlier_window_minutes'], # Duration, in minutes, of rolling outlier removal window
+            outlier_sigma = RULES['outlier_sigma'], # Number of standard deviations beyond which to discard outliers in rolling removal
+            resampling_window = RULES['resampling_window_minutes'], # Duration, in minutes, of resampling window
             storm_events = storm_events,
             weather_data = cid_data,
-            storm_removal = False # discard stormy data?
+            storm_removal = RULES['storm_removal'] # discard stormy data?
         )
 
         # Define 3-class bulk Richardson number stability classification scheme
-        stability_classifier = StabilityClassifier(
-            parameter = 'Ri_bulk',
-            classes = [
-                ('unstable', '(-inf,-0.1)'),
-                ('neutral', '[-0.1,0.1]'),
-                ('stable', '(0.1,inf)')
-            ]
-        )
+        if RULES['stability_classes'] == 3:
+            stability_classifier = StabilityClassifier(
+                parameter = 'Ri_bulk',
+                classes = [
+                    ('unstable', '(-inf,-0.1)'),
+                    ('neutral', '[-0.1,0.1]'),
+                    ('stable', '(0.1,inf)')
+                ]
+            )
+        elif RULES['stability_classes'] == 4:
+            stability_classifier = StabilityClassifier(
+                parameter = 'Ri_bulk',
+                classes = [
+                    ('unstable', '(-inf,-0.1)'),
+                    ('neutral', '[-0.1,0.1]'),
+                    ('stable', '(0.1,0.25]'),
+                    ('strongly stable', '(0.25,inf)')
+                ]
+            )
+        else:
+            raise Exception(f"Unrecognized number of stability classes ({RULES['stability_classes']})")
 
         # Define the terrain classification scheme
         terrain_classifier = TerrainClassifier(
             complexCenter = 315,
             openCenter = 135,
-            radius = 30,
+            radius = RULES['terrain_window_width_degrees']/2,
             inclusive = True,
-            height = 10
+            height = RULES['terrain_wind_height_meters']
         )
 
         df = compute_values(
@@ -360,23 +373,19 @@ if __name__ == '__main__':
 
         print('Complete, saving results')
 
-        df.to_csv(f'{PARENTDIR}/results/output.csv', index = False)
-        storm_events.to_csv(f'{PARENTDIR}/results/storms.csv', index = False)
-        cid_data.to_csv(f'{PARENTDIR}/results/cid.csv', index = False)
+        save_results(df = df, storm_events = storm_events, cid_data = cid_data, rules = RULES, savedir = f'{PARENTDIR}/results')
+        # df.to_csv(f'{PARENTDIR}/results/output.csv')
+        # storm_events.to_csv(f'{PARENTDIR}/results/storms.csv')
+        # cid_data.to_csv(f'{PARENTDIR}/results/cid.csv')
     else:
         print('RELOAD set to False, will use previous output.')
 
-    print('Loading results')
-    df = pd.read_csv(f'{PARENTDIR}/results/output.csv')
-    df['time'] = pd.to_datetime(df['time'], utc=True) # will convert to UTC!
-    df['time'] = df['time'].dt.tz_convert('US/Central')
+    print('Loading results...')
 
-    storm_events = pd.read_csv(f'{PARENTDIR}/results/storms.csv')
-    
-    cid_data = pd.read_csv(f'{PARENTDIR}/results/cid.csv')
-    cid_data['time'] = pd.to_datetime(cid_data['time'], utc=True) # will convert to UTC!
-    cid_data['time'] = cid_data['time'].dt.tz_convert('US/Central')
+    df, storm_events, cid_data, summary = load_results(f'{PARENTDIR}/results')
+    if not validate_summary(summary = summary, df = df, storm_events = storm_events, cid_data = cid_data):
+        raise Exception('Failed to validate results. Please either fix files or re-run with `-r` flag in order to set RELOAD=True.')
 
-    print('Results loaded')
+    print('Results loaded successfully!')
 
-    temp_plots(df = df, cid = cid_data)
+    generate_plots(df = df, cid = cid_data, savedir = f'{PARENTDIR}/figs', summary = summary)
