@@ -31,7 +31,7 @@ def _convert_pressure(series, from_unit, gravity = atmos.STANDARD_GRAVITY):
         at height of <number> meters
     """
     if _standards['p'] != 'kPa':
-        raise(f'preprocess._convert_pressure: Standardized pressure changed from kPa to {_standards["p"]} unexpectedly')
+        raise Exception(f'preprocess._convert_pressure: Standardized pressure changed from kPa to {_standards["p"]} unexpectedly')
     if '_' in from_unit:
         from_unit, masl = from_unit.split('_')
         meters_asl = float(masl[:-3])
@@ -44,14 +44,14 @@ def _convert_pressure(series, from_unit, gravity = atmos.STANDARD_GRAVITY):
         case 'mBar':
             return series / 10.
         case _:
-            raise(f'preprocess._convert_pressure: Unrecognized pressure unit {from_unit}')
+            raise Exception(f'preprocess._convert_pressure: Unrecognized pressure unit {from_unit}')
         
 def _convert_temperature(series, from_unit):
     """
     Conversion of temperature units
     """
     if _standards['t'] != 'K':
-        raise(f'preprocess._convert_temperature: Standardized temperature changed from K to {_standards["t"]} unexpectedly')
+        raise Exception(f'preprocess._convert_temperature: Standardized temperature changed from K to {_standards["t"]} unexpectedly')
     match from_unit:
         case 'K':
             return series
@@ -60,7 +60,7 @@ def _convert_temperature(series, from_unit):
         case 'F':
             return (series - 32) * (5/9) + 273.15
         case _:
-            raise(f'preprocess._convert_temperature: Unrecognized temperature unit {from_unit}')
+            raise Exception(f'preprocess._convert_temperature: Unrecognized temperature unit {from_unit}')
 
 def _convert_humidity(series, from_unit):
     """
@@ -70,7 +70,7 @@ def _convert_humidity(series, from_unit):
         and decimal (0-1) scales
     """
     if _standards['rh'] != 'decimal':
-        raise(f'preprocess._convert_humidity: Standardized relative humidity changed from decimal to {_standards["rh"]} unexpectedly')
+        raise Exception(f'preprocess._convert_humidity: Standardized relative humidity changed from decimal to {_standards["rh"]} unexpectedly')
     match from_unit:
         case 'decimal':
             return series
@@ -81,14 +81,14 @@ def _convert_humidity(series, from_unit):
         case 'percent':
             return series / 100.
         case _:
-            raise(f'preprocess._convert_humidity: Unrecognized humidity unit {from_unit}')
+            raise Exception(f'preprocess._convert_humidity: Unrecognized humidity unit {from_unit}')
 
 def _convert_speed(series, from_unit):
     """
     Conversion of wind speed units
     """
     if _standards['ws'] != 'm/s':
-        raise(f'preprocess._convert_speed: Standardized wind speed changed from m/s to {_standards["ws"]} unexpectedly')
+        raise Exception(f'preprocess._convert_speed: Standardized wind speed changed from m/s to {_standards["ws"]} unexpectedly')
     match from_unit:
         case 'm/s':
             return series
@@ -99,27 +99,27 @@ def _convert_speed(series, from_unit):
         case 'mi/h':
             return series / 2.23694
         case _:
-            raise(f'preprocess._convert_speed: Unrecognized wind speed unit {from_unit}')
+            raise Exception(f'preprocess._convert_speed: Unrecognized wind speed unit {from_unit}')
 
 def _convert_direction(series, from_unit):
     """
     Conversion of wind direction
     """
     if _standards['wd'] != ('degrees', 'N', 'CW'):
-        raise(f'preprocess._convert_direction: Standardized wind speed changed from degrees CW of N to {_standards["wd"][0]} {_standards["wd"][2]} of {_standards["wd"][1]} unexpectedly')
+        raise Exception(f'preprocess._convert_direction: Standardized wind speed changed from degrees CW of N to {_standards["wd"][0]} {_standards["wd"][2]} of {_standards["wd"][1]} unexpectedly')
     measure, zero, orient = from_unit
     
     # Convert measure to degrees (possibly from radians)
     if measure in ['rad', 'radians']:
         series = np.rad2deg(series)
     elif measure not in ['deg', 'degrees']:
-        raise(f'preprocess._convert_direction: Unrecognized angle measure {measure}')
+        raise Exception(f'preprocess._convert_direction: Unrecognized angle measure {measure}')
     
     # Convert orientation to clockwise (possibly from counterclockwise)
     if orient.lower() in ['ccw', 'counterclockwise']:
         series = (-series) % 360
     elif orient.lower() not in ['cw', 'clockwise']:
-        raise(f'preprocess._convert_direction: Unrecognized angle orientation {orient}')
+        raise Exception(f'preprocess._convert_direction: Unrecognized angle orientation {orient}')
     
     # Align zero point to north
     if type(zero) is str:
@@ -137,7 +137,7 @@ def _convert_direction(series, from_unit):
         # From degrees offset
         return (series - zero) % 360
     else:
-        raise(f'preprocess._convert_direction: Unrecognized zero type {type(zero)} for {zero}')
+        raise Exception(f'preprocess._convert_direction: Unrecognized zero type {type(zero)} for {zero}')
 
 def convert_dataframe_units(df, from_units, gravity = atmos.STANDARD_GRAVITY, silent = False):
     """
@@ -230,7 +230,7 @@ def shadowing_merge(df,
     Returns two columns: merged wind speeds and merged wind directions.
     """
     if not (len(speeds) == len(directions) == len(angles)):
-        raise(f'preprocess.shadowing_merge: Mismatched lengths for speeds/directions/angles (given lengths {len(speeds)}/{len(directions)}/{len(angles)})')
+        raise Exception(f'preprocess.shadowing_merge: Mismatched lengths for speeds/directions/angles (given lengths {len(speeds)}/{len(directions)}/{len(angles)})')
     nBooms = len(speeds)
     radius = width / 2
     raw_deviations = [(df[dir] - ang) % 360 for dir, ang in zip(directions, angles)]
@@ -292,7 +292,7 @@ def remove_data(df: pd.DataFrame, periods: dict, silent: bool = False) -> pd.Dat
                         result.loc[indices, selection] = np.nan
             partial_removals += len(indices)
         else:
-            raise('preprocess.remove_data: Unrecognized removal-height specification in given periods', periods)
+            raise Exception('preprocess.remove_data: Unrecognized removal-height specification in given periods', periods)
     
     result.set_index('time', inplace = True)
     
@@ -353,7 +353,7 @@ def resample(df: pd.DataFrame,
     elif how == 'median':
         resampled = to_resample.resample(window).median()
     else:
-        raise(f'preprocess.resample: Unrecognized resampling method {how}')
+        raise Exception(f'preprocess.resample: Unrecognized resampling method {how}')
     
     before_drop = resampled.shape[0]
     resampled.dropna(axis = 0, how = 'all', inplace = True)

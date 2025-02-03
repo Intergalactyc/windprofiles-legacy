@@ -413,4 +413,4 @@ def compare_temperature(df: pd.DataFrame, cid: pd.DataFrame):
 def generate_plots(df: pd.DataFrame, cid: pd.DataFrame):
     #print_storm_amounts(df)
     raw_data_with_storms(df)
-    compare_temperature(df, cid)
+    #compare_temperature(df, cid)

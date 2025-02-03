@@ -21,7 +21,7 @@ class CoordinateRegion:
         """
         # Would like to add in ability to use distance radius rather than just angular
         if unit not in ['km', 'm', 'kilometers', 'meters', 'mi', 'miles']:
-            raise(f"Unit {unit} not recognized")
+            raise Exception(f"Unit {unit} not recognized")
         self._unit = unit
         self._lat = latitude
         self._long = longitude
@@ -42,7 +42,7 @@ class CoordinateRegion:
             case 'miles':
                 return distance.mi
             case _:
-                raise(f'Failure in distance conversion for distance {distance} and unit {self._unit}')
+                raise Exception(f'Failure in distance conversion for distance {distance} and unit {self._unit}')
 
     def classify(self, latitude, longitude):
         """
@@ -154,7 +154,7 @@ class _TemplateClassifier(ABC):
                     )
                 ):
                 return clName
-        raise("classify._TemplateClassifier.classify: unknown error encountered")
+        raise Exception("classify._TemplateClassifier.classify: unknown error encountered")
     
     def classify_rows(self, df: pd.DataFrame) -> pd.Series:
         """
@@ -162,10 +162,10 @@ class _TemplateClassifier(ABC):
         """
         if self._parameter is not None:
             if self._parameter not in df.columns:
-                raise(f"classify._TemplateClassifier.classify_rows: parameter {self._parameter} not found in columns of given pd.DataFrame")
+                raise Exception(f"classify._TemplateClassifier.classify_rows: parameter {self._parameter} not found in columns of given pd.DataFrame")
             return df.apply(lambda row : self.classify(row[self._parameter]), axis = 1).astype('category')
         else:
-            raise("classify._TemplateClassifier.classify_rows: no parameter provided")
+            raise Exception("classify._TemplateClassifier.classify_rows: no parameter provided")
 
     def get_classes(self, other: bool = True) -> list:
         """
@@ -192,11 +192,11 @@ class PolarClassifier(_TemplateClassifier):
                   inclusive: bool = True):
         
         if (radius is not None and width is not None) and radius != width / 2:
-            raise("classify.PolarClassifier.add_class: Conflicting radius and width arguments passed")
+            raise Exception("classify.PolarClassifier.add_class: Conflicting radius and width arguments passed")
         if radius is None and width is None:
-            raise("classify.PolarClassifier.add_class: Width or radius must be specified")
+            raise Exception("classify.PolarClassifier.add_class: Width or radius must be specified")
         if (isinstance(radius, Number) and radius < 0) or (isinstance(width, Number) and width < 0):
-            raise("classify.PolarClassifier.add_class: Negative radius or width provided")
+            raise Exception("classify.PolarClassifier.add_class: Negative radius or width provided")
         
         if width is not None and radius is None:
             radius = width / 2
@@ -221,20 +221,20 @@ class SingleClassifier(_TemplateClassifier):
 
     def _parse_interval(self, interval):
         if type(interval) is not str:
-            raise("classify.SingleClassifier._parse_interval: provided interval must be a string")
+            raise Exception("classify.SingleClassifier._parse_interval: provided interval must be a string")
         
         stripped = interval.replace(' ','')
         leftP = stripped[0]
         rightP = stripped[-1]
 
         if leftP not in ['[','('] or rightP not in [']',')']:
-            raise("classify.SingleClassifier._parse_interval: provided interval must be in valid parenthetical format")
+            raise Exception("classify.SingleClassifier._parse_interval: provided interval must be in valid parenthetical format")
         
         cleaned = stripped[1:-1]
         split = cleaned.split(',')
 
         if len(split) != 2:
-            raise("classify.SingleClassifier._parse_interval: provided interval must contain a single delimiting comma ','")
+            raise Exception("classify.SingleClassifier._parse_interval: provided interval must contain a single delimiting comma ','")
         
         if split[0].lower in ['-inf','-infty','-infinity','-np.inf']:
             leftV = -np.inf
@@ -242,7 +242,7 @@ class SingleClassifier(_TemplateClassifier):
             try:
                 leftV = float(split[0])
             except ValueError:
-                raise(f"classify.SingleClassifier._parse_interval: invalid left bound '{leftV}'")
+                raise Exception(f"classify.SingleClassifier._parse_interval: invalid left bound '{leftV}'")
         
         if split[1].lower in ['inf','infty','infinity','np.inf','+inf','+infty','+infinity','+np.inf']:
             rightV = np.inf
@@ -250,7 +250,7 @@ class SingleClassifier(_TemplateClassifier):
             try:
                 rightV = float(split[1])
             except ValueError:
-                raise(f"classify.SingleClassifier._parse_interval: invalid left bound '{leftV}'")
+                raise Exception(f"classify.SingleClassifier._parse_interval: invalid left bound '{leftV}'")
 
         left_bound = leftV if leftP == '(' else [leftV]
         right_bound = rightV if rightP == ')' else [rightV]
@@ -278,9 +278,9 @@ class SingleClassifier(_TemplateClassifier):
                                    rule = rule)
         else:
             if left_inclusive is not None and left_exclusive is not None:
-                raise("classify.SingleClassifier.add_class: Only one of left_inclusive or left_exclusive may be provided")
+                raise Exception("classify.SingleClassifier.add_class: Only one of left_inclusive or left_exclusive may be provided")
             if right_inclusive is not None and right_exclusive is not None:
-                raise("classify.SingleClassifier.add_class: Only one of right_inclusive or right_exclusive may be provided")
+                raise Exception("classify.SingleClassifier.add_class: Only one of right_inclusive or right_exclusive may be provided")
             
             if self._validate(left_inclusive):
                 left_bound = [left_inclusive]
