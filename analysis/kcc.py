@@ -9,11 +9,12 @@ import json
 import sys
 import os
 from kcc_definitions import *
+from functools import reduce
 
-PARENTDIR = 'C:/Users/22wal/OneDrive/GLWind' # If you are not Elliott and this is not the path for you then pass argument -p followed by the correct path when running!
+PARENTDIR = 'C:/Users/22wal/OneDrive/GLWind' # If you are not Elliott and this is not the path for you then pass argument -d followed by the correct path when running!
 
 RULES = {
-    'shadowing_width' : 30,
+    'shadowing_width_degrees' : 30,
     'storm_radius_km' : 25,
     'storm_removal' : False,
     'default_removals' : True,
@@ -202,8 +203,8 @@ def compute_values(df,
 
     return df
 
-def generate_plots(df: pd.DataFrame, cid: pd.DataFrame, savedir: str, summary: dict):
-    finalplots.generate_plots(df = df, cid = cid, savedir = savedir, summary = summary)
+def generate_plots(df: pd.DataFrame, cid: pd.DataFrame, savedir: str, summary: dict, poster: bool):
+    finalplots.generate_plots(df = df, cid = cid, savedir = savedir, summary = summary, poster = poster)
 
 def get_storm_events(start_time, end_time, radius: int|float = 25., unit: str = 'km'):
     region = CoordinateRegion(latitude = LATITUDE, longitude = LONGITUDE, radius = radius, unit = unit)
@@ -236,11 +237,16 @@ def get_weather_data(start_time, end_time):
     cid = cid[(cid['time'] <= end_time) & (cid['time'] >= start_time)].reset_index(drop = True)
     return cid
 
+def dict_checksum(d: dict, verbose: bool = False) -> int:
+    result = abs(reduce(lambda x,y : x^y, [hash(item) for item in d.items()]))
+    if verbose:
+        print(result)
+    return result
+
 def dataframe_checksum(df: pd.DataFrame, verbose: bool = False) -> int:
     result = int(pd.util.hash_pandas_object(df).sum())
     if verbose:
         print(result)
-        print(f'(type: {type(result)})')
     return result
 
 def save_results(df: pd.DataFrame, storm_events: pd.DataFrame, cid_data: pd.DataFrame, rules: dict, savedir: str):
@@ -251,6 +257,7 @@ def save_results(df: pd.DataFrame, storm_events: pd.DataFrame, cid_data: pd.Data
     summary['_df_chksum'] = dataframe_checksum(df)
     summary['_storm_chksum'] = dataframe_checksum(storm_events)
     summary['_cid_chksum'] = dataframe_checksum(cid_data)
+    summary['_rules_chksum'] = dict_checksum(rules)
     with open(f'{savedir}/summary.json', 'w') as f:
         json.dump(summary, f)
     print('Saved summary JSON')
@@ -292,14 +299,17 @@ def validate_summary(summary: dict, df: pd.DataFrame, storm_events: pd.DataFrame
 
 if __name__ == '__main__':
     RELOAD = False
+    POSTER = False
     if len(sys.argv) > 1:
         if '-r' in sys.argv:
             RELOAD = True
-        if '-p' in sys.argv:
-            p_index = sys.argv.index('-p')
+        if '-d' in sys.argv:
+            p_index = sys.argv.index('-d')
             if p_index == len(sys.argv) - 1:
-                raise Exception('Must follow -p flag with path to parent directory (directory containing /data/), in UNIX format without any quotation marks')
+                raise Exception('Must follow -d flag with path to parent directory (directory containing /data/), in UNIX format without any quotation marks')
             PARENTDIR = sys.argv[p_index + 1]
+        if '-p' in sys.argv:
+            POSTER = True
     
     if RELOAD:
         df = load_data(
@@ -317,7 +327,7 @@ if __name__ == '__main__':
 
         df = perform_preprocessing(
             df = df,
-            shadowing_width = RULES['shadowing_width'], # width, in degrees, of shadowing bins
+            shadowing_width = RULES['shadowing_width_degrees'], # width, in degrees, of shadowing bins
             removal_periods = {
                 ('2018-03-05 13:20:00','2018-03-10 00:00:00') : 'ALL', # large maintenance gap
                 ('2018-04-18 17:40:00','2018-04-19 14:20:00') : [106], # small maintenance-shaped gap
@@ -337,8 +347,8 @@ if __name__ == '__main__':
                 parameter = 'Ri_bulk',
                 classes = [
                     ('unstable', '(-inf,-0.1)'),
-                    ('neutral', '[-0.1,0.1]'),
-                    ('stable', '(0.1,inf)')
+                    ('neutral', '[-0.1,0.1)'),
+                    ('stable', '[0.1,inf)')
                 ]
             )
         elif RULES['stability_classes'] == 4:
@@ -346,9 +356,9 @@ if __name__ == '__main__':
                 parameter = 'Ri_bulk',
                 classes = [
                     ('unstable', '(-inf,-0.1)'),
-                    ('neutral', '[-0.1,0.1]'),
-                    ('stable', '(0.1,0.25]'),
-                    ('strongly stable', '(0.25,inf)')
+                    ('neutral', '[-0.1,0.1)'),
+                    ('stable', '[0.1,0.25)'),
+                    ('strongly stable', '[0.25,inf)')
                 ]
             )
         else:
@@ -388,4 +398,4 @@ if __name__ == '__main__':
 
     print('Results loaded successfully!')
 
-    generate_plots(df = df, cid = cid_data, savedir = f'{PARENTDIR}/figs', summary = summary)
+    generate_plots(df = df, cid = cid_data, savedir = f'{PARENTDIR}/figs', summary = summary, poster = POSTER)

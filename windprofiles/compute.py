@@ -59,9 +59,9 @@ def environmental_lapse_rate(df: pd.DataFrame, variable: str, heights: list[int,
         print(f'compute.environmental_lapse_rate() - computing lapse rate of {variable}')
 
     if type(heights) not in [list, tuple] or len(heights) != 2 or heights[0] == heights[1]:
-        raise(f'compute.environmental_lapse_rate: invalid heights {heights}')
+        raise Exception(f'compute.environmental_lapse_rate: invalid heights {heights}')
     if type(variable) is not str:
-        raise(f'compute.environmental_lapse_rate: invalid variable {variable}')
+        raise Exception(f'compute.environmental_lapse_rate: invalid variable {variable}')
 
     h1 = int(min(heights))
     h2 = int(max(heights))
@@ -71,9 +71,9 @@ def environmental_lapse_rate(df: pd.DataFrame, variable: str, heights: list[int,
     result = df.copy()
 
     if not h1_str in result.columns:
-        raise(f'compute.environmental_lapse_rate: {h1_str} not found in DataFrame columns')
+        raise Exception(f'compute.environmental_lapse_rate: {h1_str} not found in DataFrame columns')
     if not h2_str in result.columns:
-        raise(f'compute.environmental_lapse_rate: {h2_str} not found in DataFrame columns')
+        raise Exception(f'compute.environmental_lapse_rate: {h2_str} not found in DataFrame columns')
     
     result[f'{variable}_lapse'] = (result[h2_str] - result[h1_str])/(h2 - h1)
 
@@ -91,7 +91,7 @@ def bulk_richardson_number(df: pd.DataFrame, heights: list[int, int], *, silent:
         print(f'compute.bulk_richardson_number() - computing bulk Ri')
 
     if type(heights) not in [list, tuple] or len(heights) != 2 or heights[0] == heights[1]:
-        raise(f'compute.environmental_lapse_rate: invalid heights {heights}')
+        raise Exception(f'compute.environmental_lapse_rate: invalid heights {heights}')
     
     h_lower = int(min(heights))
     h_upper = int(max(heights))
@@ -140,11 +140,11 @@ def power_law_fits(df: pd.DataFrame, heights: list[int], minimum_present: int = 
         print(f'compute.power_law_fits() - computing power law fits using {heights}')
 
     if type(minimum_present) is not int or minimum_present < 2:
-        raise(f'windprofiles.compute.power_law_fits - invalid argument \'{minimum_present}\' passed to \'minimum_present\'')
+        raise Exception(f'windprofiles.compute.power_law_fits - invalid argument \'{minimum_present}\' passed to \'minimum_present\'')
     if len(heights) < minimum_present:
-        raise(f'windprofiles.compute.power_law_fits - insufficient number of heights provided') 
+        raise Exception(f'windprofiles.compute.power_law_fits - insufficient number of heights provided') 
     if type(columns) not in [tuple, list] or len(columns) != 2:
-        raise(f'windprofiles.compute.power_law_fits - \'columns\' must be a tuple or list of two column names for the multiplicative coefficient and power, respectively')
+        raise Exception(f'windprofiles.compute.power_law_fits - \'columns\' must be a tuple or list of two column names for the multiplicative coefficient and power, respectively')
 
     result = df.copy()
 
