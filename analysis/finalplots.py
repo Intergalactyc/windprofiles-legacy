@@ -107,7 +107,7 @@ def annual_profiles(df, summary, size, saveto, poster):
             means = dfs[[f'ws_{h}m' for h in HEIGHTS]].mean(axis = 0).values
             mult, wsc = stats.power_fit(HEIGHTS, means)
             ax.plot(mult * ZVALS**wsc, ZVALS, color = change_luminosity(COLORS[sc], 0.85), zorder = 0)
-            ax.scatter(means, HEIGHTS, label = r'{sc}: $u(z)={a:.2f}z^{{{b:.3f}}}$'.format(sc=short,a=mult,b=wsc), color = COLORS[sc], zorder = 5, s = 75, marker = MARKERS[sc])
+            ax.scatter(means, HEIGHTS, label = r'{sc}: $u(z)={a:.2f}z^{{{b:.3f}}}$'.format(sc=short,a=mult,b=wsc), color = COLORS[sc], zorder = 5, s = 75*3**poster, marker = MARKERS[sc])
         ax.set_xlabel('Mean Wind Speed (m/s)')
         if i == 0: ax.set_ylabel('Height (m)')
         if poster:
@@ -145,7 +145,7 @@ def veer_profiles(df, summary, size, saveto, poster):
             dfs = dft[dft['stability'] == sc]
             means = [polar.unit_average_direction(dfs[f'wd_{h}m']) for h in HEIGHTS]
             ax.plot(means, HEIGHTS, color = change_luminosity(COLORS[sc], 0.85), zorder = 0)
-            ax.scatter(means, HEIGHTS, label = sc.title(), zorder = 5, s = 75, marker = MARKERS[sc], facecolors = 'none', edgecolors = COLORS[sc], linewidths = 1.5)
+            ax.scatter(means, HEIGHTS, label = sc.title(), zorder = 5, s = 75*3**poster, marker = MARKERS[sc], facecolors = 'none', edgecolors = COLORS[sc], linewidths = 1.5)
         ax.set_xlabel('Mean Wind Direction (degrees)')
         if i == 0:
             ax.set_ylabel('Height (m)')
@@ -197,22 +197,23 @@ def list_possible_plots():
     for tag in ALL_PLOTS.keys():
         print(f'\t{tag}')
 
-def generate_plots(df: pd.DataFrame, cid: pd.DataFrame, savedir: str, summary: dict, which: list = ALL_PLOTS.keys(), poster: bool = False):
-    plt.rcParams['font.size'] = 15 if poster else 14
+def generate_plots(df: pd.DataFrame, savedir: str, summary: dict, which: list = ALL_PLOTS.keys(), poster: bool = False, **kwargs):
+    plt.rcParams['font.size'] = 26 if poster else 14
     plt.rcParams['font.family'] = 'sans-serif' if poster else 'serif'
-    plt.rcParams['mathtext.fontset'] = 'stix'
-    # For now the cid argument is not used but I'm leaving it in case that changes
-    print(f'Generating final plots in {"poster" if poster else "paper"}')
+    plt.rcParams['mathtext.fontset'] = 'dejavusans' if poster else 'stix'
+    print(f'Generating final plots in {"poster" if poster else "paper"} mode')
     not_generated = list(ALL_PLOTS.keys())
     fig_savedir = f'{savedir}/{"P" if poster else ""}{summary["_rules_chksum"]}'
     os.makedirs(fig_savedir, exist_ok = True)
     for tag in which:
         long, plotter, size = ALL_PLOTS[tag]
         print(f"Generating plot {tag}: '{long}'")
+        if poster: size = (2*size[0],2*size[1]) # higher quality for poster scaling
         plotter(df = df, summary = summary, size = size, saveto = f'{fig_savedir}/{tag}.png', poster = poster)
         not_generated.remove(tag)
     if len(not_generated) != 0:
         print(f'Plots not generated: {not_generated}') 
+    print(f'Finished generating plots. Final plots saved to:\n\t{fig_savedir}/')
     print('Rules used in analysis to create plot data:')
     for key, val in summary.items():
         if key[0] != '_':
