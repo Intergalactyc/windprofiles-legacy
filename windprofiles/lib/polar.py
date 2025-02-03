@@ -37,18 +37,24 @@ def polar_average(magnitudes, directions, degrees: bool = True):
     """
     Computes true vector average of vectors provided in polar form.
     """
-    if len(magnitudes) != len(directions):
+    if (type(magnitudes) not in [int, float]) and (len(magnitudes) != len(directions)):
         raise(f"lib.polar.polar_average: mismatched lengths of magnitudes/directions ({len(magnitudes)/len(directions)})")
     
     directions_rad = np.deg2rad(directions) if degrees else directions
 
-    xs = magnitudes * np.cos(directions_rad)
-    ys = magnitudes * np.sin(directions_rad)
+    xs = magnitudes * np.sin(directions_rad) # the polar_wind function uses this swapped convention, so as we are calling it here, we must also use that convention for consistency.
+    ys = magnitudes * np.cos(directions_rad)
     
     xavg = np.mean(xs)
     yavg = np.mean(ys)
 
     return polar_wind(xavg, yavg, degrees = degrees)
+
+def unit_average_direction(directions, degrees: bool = True):
+    """
+    Computes unit vector average of directions.
+    """
+    return polar_average(magnitudes = 1, directions = directions, degrees = degrees)[1]
 
 def angular_distance(theta, phi, degrees: bool = True):
     """
