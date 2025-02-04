@@ -6,14 +6,14 @@ import windprofiles.lib.stats as stats
 import windprofiles.lib.polar as polar
 
 COLORS_POSTER = {
-    'open' : '#1f77b4', # tab:blue C0
-    'complex' : '#ff7f0e', # tab:orange C1
-    'unstable' : '#ef476f', # bright pink
-    'neutral' : '#ffd166', # sunglow yellow (or try #ffa62b)
-    'stable' : '#06d6a0', # emerald green
-    'strongly stable' : '#17becf', # robin egg blue
-    'default1' : '#7f7f7f', # C7 gray
-    'default2' : '#2ca02c', # C2 green
+    'open' : '#1f77b4',
+    'complex' : '#ff7f0e',
+    'unstable' : '#ed2857',
+    'neutral' : '#fcc749',
+    'stable' : '#0aa179',
+    'strongly stable' : '#119dab',
+    'default1' : '#7f7f7f',
+    'default2' : '#2ca02c',
 }
 
 COLORS_FORMAL = {
@@ -43,13 +43,13 @@ ZVALS = np.linspace(0.,130.,400) # Linspace for plotting heights
 
 def change_luminosity(color, amount=1):
     """
-    Lightens the given color by multiplying (1-luminosity) by the given amount.
+    Changes the luminosity of the given color.
     Input can be matplotlib color string, hex string, or RGB tuple.
 
     Examples:
-    >> lighten_color('g', 0.3)
-    >> lighten_color('#F034A3', 0.6)
-    >> lighten_color((.3,.55,.1), 0.5)
+    >> change_luminosity('g', 0.3)
+    >> change_luminosity('#F034A3', 0.6)
+    >> change_luminosity((.3,.55,.1), 1.5)
     """
     import matplotlib.colors as mc
     import colorsys
@@ -145,7 +145,7 @@ def veer_profiles(df, summary, size, saveto, poster):
             dfs = dft[dft['stability'] == sc]
             means = [polar.unit_average_direction(dfs[f'wd_{h}m']) for h in HEIGHTS]
             ax.plot(means, HEIGHTS, color = change_luminosity(COLORS[sc], 0.85), zorder = 0)
-            ax.scatter(means, HEIGHTS, label = sc.title(), zorder = 5, s = 75*3**poster, marker = MARKERS[sc], facecolors = 'none', edgecolors = COLORS[sc], linewidths = 1.5)
+            ax.scatter(means, HEIGHTS, label = sc.title(), zorder = 5, s = 75*3**poster, marker = MARKERS[sc], facecolors = 'none', edgecolors = COLORS[sc], linewidths = 1.5*2**poster)
         ax.set_xlabel('Mean Wind Direction (degrees)')
         if i == 0:
             ax.set_ylabel('Height (m)')
