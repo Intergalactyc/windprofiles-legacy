@@ -1,5 +1,6 @@
 import pandas as pd
 from tqdm import tqdm
+import datetime
 
 def test_frame_discrepancy_by_row(df1, df2, silent = False, details = False, exact = False, progress = False):
     """
@@ -33,3 +34,6 @@ def test_frame_discrepancy_by_row(df1, df2, silent = False, details = False, exa
         n = len(caught_rows)
         print(f'\n\n\n\n\n{n} data points affected ({100*n/n_total:.2f}%)\n\n\n\n\n')
     return caught_rows
+
+def time_to_hours(dt: datetime.datetime):
+    return dt.hour + dt.minute / 60 + dt.second / 3600
