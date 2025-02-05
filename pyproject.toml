@@ -24,7 +24,8 @@ dependencies = [
     "scipy",
     "windrose",
     "geopy",
-    "fastparquet"
+    "fastparquet",
+    "astral"
 ]
 
 [project.urls]

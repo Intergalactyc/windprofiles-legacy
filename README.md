@@ -14,6 +14,13 @@ tqdm
 scipy
 windrose
 
+Optional Recommended Python packages (needed if using samples in `analyze/`)
+-----------------------
+geopy
+fastparquet
+astral
+*note: currently, pyproject.toml is set up to require these as dependencies*
+
 Structuring
 -----------------------
 Code up until now is in `src_old/`. Most of the stuff in `src_old/old` isn't really useful anymore. I'll note that the `newsonic.py` is not currently functional. Right now, `combine.py` puts the KCC data together, `reduce.py` does basic QC and then computes useful values, and `plots.py` (as well as `roses.py` for some wind rose stuff) does a strange mix of analysis and plotting. `sonic.py` is being updated into `newsonic.py` to do an okay job handling analysis of ultrasonic data, but this is even more of a WIP. `helper_functions.py` has a variety of common statistical, scientific, or purely convenience functions used by any and all of the others.

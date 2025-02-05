@@ -203,8 +203,8 @@ def compute_values(df,
 
     return df
 
-def generate_plots(df: pd.DataFrame, cid: pd.DataFrame, savedir: str, summary: dict, poster: bool):
-    finalplots.generate_plots(df = df, cid = cid, savedir = savedir, summary = summary, poster = poster)
+def generate_plots(df: pd.DataFrame, cid: pd.DataFrame, savedir: str, summary: dict, poster: bool, details: bool):
+    finalplots.generate_plots(df = df, cid = cid, savedir = savedir, summary = summary, poster = poster, details = details)
 
 def get_storm_events(start_time, end_time, radius: int|float = 25., unit: str = 'km'):
     region = CoordinateRegion(latitude = LATITUDE, longitude = LONGITUDE, radius = radius, unit = unit)
@@ -250,7 +250,7 @@ def dataframe_checksum(df: pd.DataFrame, verbose: bool = False) -> int:
     return result
 
 def save_results(df: pd.DataFrame, storm_events: pd.DataFrame, cid_data: pd.DataFrame, rules: dict, savedir: str):
-    print(f'Saving results to directory {savedir}')
+    print(f'Saving results in directory {savedir}')
 
     summary = rules
     print('Computing validation checksums for summary file')
@@ -258,20 +258,33 @@ def save_results(df: pd.DataFrame, storm_events: pd.DataFrame, cid_data: pd.Data
     summary['_storm_chksum'] = dataframe_checksum(storm_events)
     summary['_cid_chksum'] = dataframe_checksum(cid_data)
     summary['_rules_chksum'] = dict_checksum(rules)
-    with open(f'{savedir}/summary.json', 'w') as f:
+    savepath = f"{savedir}/{summary['_rules_chksum']}"
+    recentpath = f"{savedir}/recent"
+    print(f"Saving to record subdirectory for rules checksum {summary['_rules_chksum']}, as well as 'recent' subdirectory")
+    os.makedirs(savepath, exist_ok = True)
+    os.makedirs(recentpath, exist_ok = True)
+    with open(f'{savepath}/summary.json', 'w') as f:
+        json.dump(summary, f)
+    with open(f'{recentpath}/summary.json', 'w') as f:
         json.dump(summary, f)
     print('Saved summary JSON')
 
-    df.to_csv(f'{savedir}/output.csv')
-    df.to_parquet(f'{savedir}/output.parquet')
+    df.to_csv(f'{savepath}/output.csv')
+    df.to_parquet(f'{savepath}/output.parquet')
+    df.to_csv(f'{recentpath}/output.csv')
+    df.to_parquet(f'{recentpath}/output.parquet')
     print("Saved main 'output' dataframe as CSV and Parquet")
 
-    storm_events.to_csv(f'{savedir}/storms.csv')
-    storm_events.to_parquet(f'{savedir}/storms.parquet')
+    storm_events.to_csv(f'{savepath}/storms.csv')
+    storm_events.to_parquet(f'{savepath}/storms.parquet')
+    storm_events.to_csv(f'{recentpath}/storms.csv')
+    storm_events.to_parquet(f'{recentpath}/storms.parquet')
     print("Saved 'storms' dataframe as CSV and Parquet")
 
-    cid_data.to_csv(f'{savedir}/cid.csv')
-    cid_data.to_parquet(f'{savedir}/cid.parquet')
+    cid_data.to_csv(f'{savepath}/cid.csv')
+    cid_data.to_parquet(f'{savepath}/cid.parquet')
+    cid_data.to_csv(f'{recentpath}/cid.csv')
+    cid_data.to_parquet(f'{recentpath}/cid.parquet')
     print("Saved 'cid' dataframe as CSV and Parquet")
 
 def load_results(path: str):
@@ -300,6 +313,7 @@ def validate_summary(summary: dict, df: pd.DataFrame, storm_events: pd.DataFrame
 if __name__ == '__main__':
     RELOAD = False
     POSTER = False
+    DETAILS = False
     if len(sys.argv) > 1:
         if '-r' in sys.argv:
             RELOAD = True
@@ -310,6 +324,8 @@ if __name__ == '__main__':
             PARENTDIR = sys.argv[p_index + 1]
         if '-p' in sys.argv:
             POSTER = True
+        if '-v' in sys.argv:
+            DETAILS = True
     
     if RELOAD:
         df = load_data(
@@ -384,18 +400,15 @@ if __name__ == '__main__':
         print('Complete, saving results')
 
         save_results(df = df, storm_events = storm_events, cid_data = cid_data, rules = RULES, savedir = f'{PARENTDIR}/results')
-        # df.to_csv(f'{PARENTDIR}/results/output.csv')
-        # storm_events.to_csv(f'{PARENTDIR}/results/storms.csv')
-        # cid_data.to_csv(f'{PARENTDIR}/results/cid.csv')
     else:
         print('RELOAD set to False, will use previous output.')
 
     print('Loading results...')
 
-    df, storm_events, cid_data, summary = load_results(f'{PARENTDIR}/results')
+    df, storm_events, cid_data, summary = load_results(f'{PARENTDIR}/results/recent')
     if not validate_summary(summary = summary, df = df, storm_events = storm_events, cid_data = cid_data):
         raise Exception('Failed to validate results. Please either fix files or re-run with `-r` flag in order to set RELOAD=True.')
 
     print('Results loaded successfully!')
 
-    generate_plots(df = df, cid = cid_data, savedir = f'{PARENTDIR}/figs', summary = summary, poster = POSTER)
+    generate_plots(df = df, cid = cid_data, savedir = f'{PARENTDIR}/figs', summary = summary, poster = POSTER, details = DETAILS)
