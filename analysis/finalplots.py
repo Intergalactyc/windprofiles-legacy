@@ -4,6 +4,7 @@ import numpy as np
 import os
 import windprofiles.lib.stats as stats
 import windprofiles.lib.polar as polar
+from windprofiles.analyze import get_monthly_breakdown
 from windprofiles.lib.other import time_to_hours
 from windprofiles.plotting import change_luminosity
 import datetime
@@ -255,6 +256,9 @@ def data_gaps(df, summary, size, saveto, poster, details):
 def terrain_breakdown(df, summary, size, saveto, poster, details):
     COLORS = COLORS_POSTER if poster else COLORS_FORMAL
     fig, ax = plt.subplots(figsize = size)
+    breakdown, proportions = get_monthly_breakdown(df, 'terrain')
+    print(breakdown)
+    print(proportions)
     fig.tight_layout()
     plt.savefig(saveto, bbox_inches = 'tight')
     return
