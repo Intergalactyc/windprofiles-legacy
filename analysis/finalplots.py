@@ -15,6 +15,7 @@ from kcc_definitions import LATITUDE, LONGITUDE
 COLORS_POSTER = {
     'open' : '#1f77b4',
     'complex' : '#ff7f0e',
+    'other' : 'tab:green',
     'unstable' : '#ed2857',
     'neutral' : '#fcc749',
     'stable' : '#0aa179',
@@ -26,6 +27,7 @@ COLORS_POSTER = {
 COLORS_FORMAL = {
     'open' : 'tab:blue',
     'complex' : 'tab:orange',
+    'other' : 'tab:green',
     'unstable' : 'tab:red',
     'neutral' : '#3b50d6',
     'stable' : '#9b5445',
@@ -56,6 +58,12 @@ SEASONS = {
     'winter' : ['Dec', 'Jan', 'Feb'],
     'spring' : ['Mar', 'Apr', 'May'],
     'summer' : ['Jun', 'Jul', 'Aug']
+}
+SEASON_STRINGS = {
+    'fall' : 'Fall (Sep-Nov)',
+    'winter' : 'Winter (Dec-Feb)',
+    'spring' : 'Spring (Mar-May)',
+    'summer' : 'Summer (Jun-Aug)'
 }
 CENTERDATES = { # Solstices/equinoxes in 2018
     'fall' : datetime.date(2018, 9, 22),
@@ -168,8 +176,10 @@ def wse_histograms(df, summary, size, saveto, poster, details):
                 print(f'\tMed Ri_b: {dfs.loc[dfs["terrain"] == tc, "Ri_bulk"].median():.2f}')
         if i == ncols - 1:
             ax.legend(loc = 'upper right')
-        if nrows == 2 and i >= ncols:
+        if (nrows == 2 and i >= ncols):
             ax.set_xlabel(r'$\alpha$')
+        if (i+1) % ncols == 1:
+            ax.set_ylabel('Probability Density')
         ax.set_title(sc.title(), loc = 'left', x = 0.025, y = 0.9125)
         ax.vlines(x = [dfs.loc[dfs['terrain'] == tc, 'alpha'].median() for tc in TERRAINS], ymin = 0, ymax = ax.get_ylim()[1], colors = [change_luminosity(COLORS[tc], 1.5) for tc in TERRAINS], alpha = 0.75, linestyle = 'dashed', linewidth = 4)
     if poster:
@@ -196,7 +206,7 @@ def veer_profiles(df, summary, size, saveto, poster, details):
             ax.plot(means, HEIGHTS, color = change_luminosity(COLORS[sc], 0.85), zorder = 0)
             ax.scatter(means, HEIGHTS, label = sc.title(), zorder = 5, s = 75, marker = MARKERS[sc], facecolors = 'none', edgecolors = COLORS[sc], linewidths = 1.5)
         ax.set_xlabel('Mean Wind Direction (degrees)')
-        if i == 1:
+        if i == 0:
             ax.set_ylabel('Height (m)')
             ax.legend(loc = 'lower right')
         if poster:
@@ -240,7 +250,7 @@ def tod_wse(df, summary, size, saveto, poster, details):
             xplot = np.linspace(0, 24, 120)
             ax.plot(xplot+OFFSET*j, fitsine(xplot), color = COLORS[tc], linestyle = 'dashed', alpha = 0.75)
         ax.set_ylabel(r'$\alpha$')
-        ax.set_title(ssn.title(), loc = 'center', y = 0.9)
+        ax.set_title(SEASON_STRINGS[ssn], loc = 'center', y = 0.85)
         s = sun(LOCATION.observer, date = CENTERDATES[ssn], tzinfo = LOCATION.timezone)
         ax.vlines([time_to_hours(s['sunrise']), time_to_hours(s['sunset'])], linestyle = 'dashed', ymin = ax.get_ylim()[0], ymax = ax.get_ylim()[1], color = 'green')
         if i == 0:
@@ -266,8 +276,21 @@ def terrain_breakdown(df, summary, size, saveto, poster, details):
     COLORS = COLORS_POSTER if poster else COLORS_FORMAL
     fig, ax = plt.subplots(figsize = size)
     breakdown, proportions = get_monthly_breakdown(df, 'terrain')
-    print(breakdown)
-    print(proportions)
+    last = pd.Series(np.zeros(12, dtype = int))
+    for tc in ['open', 'complex', 'other']:
+        num = breakdown[tc].reset_index(drop = True)
+        perc = proportions[tc].reset_index(drop = True)
+        ax.bar(MONTHS, num, bottom = last, label = tc.title(), color = COLORS[tc])
+        for i in range(len(MONTHS)):
+            plt.text(i, last.iloc[i] + num.iloc[i]/2, f'{100*perc.iloc[i]:.1f}%', ha = 'center', va = 'center')
+        last += num
+    top_offset = np.max(last) / 150
+    for i in range(12):
+        plt.text(i, last.iloc[i] + top_offset, f"{'N=' if i == 0 else ''}{last.iloc[i]}", ha = 'center')
+    ax.set_xlabel('Month')
+    ax.set_ylabel('Number of Data Points')
+    ax.legend(bbox_to_anchor = (0.575,0.975))
+    if poster: fig.suptitle(f'Terrain Breakdown Based on {summary["terrain_wind_height_meters"]}m Wind Directions')
     fig.tight_layout()
     plt.savefig(saveto, bbox_inches = 'tight', edgecolor = fig.get_edgecolor())
     return
@@ -277,9 +300,9 @@ ALL_PLOTS = {
     'annual_profiles' : ('Annual Wind Profiles with Fits, by Terrain', annual_profiles, (6.5,3)),
     'wse_histograms' : ('Histograms of WSE, by Stability, including Terrain', wse_histograms, (6.5,4.5)),
     'veer_profiles' : ('Wind direction profiles, by Terrain', veer_profiles, (6.5,3)),
-    'tod_wse' : ('Time of Day Plots of WSE, by Terrain, including Stability & Fits', tod_wse, (6.5,8)),
+    'tod_wse' : ('Time of Day Plots of WSE, by Terrain, including Stability & Fits', tod_wse, (6.5,6)),
     'data_gaps' : ('Data Gap Visualization', data_gaps, (6.5,4)),
-    'terrain_breakdown' : ('Breakdown of Terrain Characterizations, by Month', terrain_breakdown, (3.5,5))
+    'terrain_breakdown' : ('Breakdown of Terrain Characterizations, by Month', terrain_breakdown, (6.5,4.5))
 }
 
 def list_possible_plots():
@@ -287,7 +310,9 @@ def list_possible_plots():
     for tag in ALL_PLOTS.keys():
         print(f'\t{tag}')
 
-def generate_plots(df: pd.DataFrame, savedir: str, summary: dict, which: list = ALL_PLOTS.keys(), poster: bool = False, details: bool = False, **kwargs):
+JUSTONE = 'tod_wse'
+
+def generate_plots(df: pd.DataFrame, savedir: str, summary: dict, which: list = [JUSTONE] if JUSTONE is not None else ALL_PLOTS.keys(), poster: bool = False, details: bool = False, **kwargs):
     plt.rcParams['font.size'] = 13 if poster else 14
     plt.rcParams['font.family'] = 'sans-serif' if poster else 'serif'
     plt.rcParams['mathtext.fontset'] = 'dejavusans' if poster else 'stix'
