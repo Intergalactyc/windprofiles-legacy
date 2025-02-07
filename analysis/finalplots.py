@@ -22,6 +22,8 @@ COLORS_POSTER = {
     'strongly stable' : '#119dab',
     'default1' : '#7f7f7f',
     'default2' : '#2ca02c',
+    'available' : 'b',
+    'unavailable' : 'r'
 }
 
 COLORS_FORMAL = {
@@ -33,7 +35,9 @@ COLORS_FORMAL = {
     'stable' : '#9b5445',
     'strongly stable' : 'tab:green',
     'default1' : 'tab:blue',
-    'default2' : 'tab:orange'
+    'default2' : 'tab:orange',
+    'available' : 'b',
+    'unavailable' : 'r'
 }
 
 MARKERS = {
@@ -265,23 +269,46 @@ def tod_wse(df, summary, size, saveto, poster, details):
     plt.savefig(saveto, bbox_inches = 'tight', edgecolor = fig.get_edgecolor())
     return
 
+import matplotlib.pyplot as plt
+import pandas as pd
+
 def data_gaps(df, summary, size, saveto, poster, details):
     # Full range of data after quality control, to show what specific times are covered by the analysis
     COLORS = COLORS_POSTER if poster else COLORS_FORMAL
-    fig, ax = plt.subplots(figsize = size, linewidth = 5*poster, edgecolor = 'k')
+    fig, ax = plt.subplots(figsize=size, linewidth=5*poster, edgecolor='k')
+
     period = summary['resampling_window_minutes']
     start = df['time'].min()
     end = df['time'].max()
-    all_times = pd.date_range(start, end, freq = f'{period}min')
-    gaps = all_times[~all_times.isin(df.time)]
-    ax.scatter(gaps, [3 for _ in gaps], s = 4, c = 'r')
-    for h in HEIGHTS:
+    all_times = pd.date_range(start, end, freq=f'{period}min')
+
+    # Identify missing timestamps
+    gaps = all_times[~all_times.isin(df['time'])]
+    ax.scatter(gaps, [0 for _ in gaps], s=2.5, c=COLORS['unavailable'])
+
+    # Plot available data at each height
+    for i, h in enumerate(HEIGHTS, 1):
         available = df[~pd.isna(df[f'ws_{h}m'])]['time']
-        ax.scatter(available, [h for _ in available], s = 3, c = 'b')
-    ax.set_yscale('log')
+        ax.scatter(available, [i for _ in available], s=2.5, c=COLORS['available'])
+
+    # Set y-axis labels and grid
+    # ax.set_yscale('log')
+    ax.set_yticks(range(len(HEIGHTS) + 1))
+    ax.set_yticklabels(['No Data'] + [f"{h}m" for h in HEIGHTS])
+    ax.yaxis.grid(True, linestyle='--', alpha=0.6)
+    ax.set_ylabel('Boom Height')
+
+    # Set x-axis grid at the start of each month
+    month_starts = pd.date_range(start=start, end=end, freq='MS')  # 'MS' = Month Start
+    ax.set_xticks(month_starts)
+    ax.set_xticklabels([f"{MONTHS[d.month - 1]}{(' \'' + str(d.year)[2:]) if (i==0 or month_starts[i].year != month_starts[i-1].year) else ''}" for i, d in enumerate(month_starts)])
+    ax.xaxis.grid(True, linestyle='--', alpha=0.6)
+    ax.set_xlabel('Time')
+
     fig.tight_layout()
-    if details: plt.show()
-    plt.savefig(saveto, bbox_inches = 'tight', edgecolor = fig.get_edgecolor())
+
+    plt.savefig(saveto, bbox_inches='tight', edgecolor=fig.get_edgecolor())
+
     return
 
 def terrain_breakdown(df, summary, size, saveto, poster, details):
