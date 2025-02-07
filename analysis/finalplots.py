@@ -266,9 +266,21 @@ def tod_wse(df, summary, size, saveto, poster, details):
     return
 
 def data_gaps(df, summary, size, saveto, poster, details):
+    # Full range of data after quality control, to show what specific times are covered by the analysis
     COLORS = COLORS_POSTER if poster else COLORS_FORMAL
     fig, ax = plt.subplots(figsize = size, linewidth = 5*poster, edgecolor = 'k')
+    period = summary['resampling_window_minutes']
+    start = df['time'].min()
+    end = df['time'].max()
+    all_times = pd.date_range(start, end, freq = f'{period}min')
+    gaps = all_times[~all_times.isin(df.time)]
+    ax.scatter(gaps, [3 for _ in gaps], s = 4, c = 'r')
+    for h in HEIGHTS:
+        available = df[~pd.isna(df[f'ws_{h}m'])]['time']
+        ax.scatter(available, [h for _ in available], s = 3, c = 'b')
+    ax.set_yscale('log')
     fig.tight_layout()
+    if details: plt.show()
     plt.savefig(saveto, bbox_inches = 'tight', edgecolor = fig.get_edgecolor())
     return
 
@@ -310,7 +322,7 @@ def list_possible_plots():
     for tag in ALL_PLOTS.keys():
         print(f'\t{tag}')
 
-JUSTONE = 'tod_wse'
+JUSTONE = 'data_gaps'
 
 def generate_plots(df: pd.DataFrame, savedir: str, summary: dict, which: list = [JUSTONE] if JUSTONE is not None else ALL_PLOTS.keys(), poster: bool = False, details: bool = False, **kwargs):
     plt.rcParams['font.size'] = 13 if poster else 14
