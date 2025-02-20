@@ -38,23 +38,23 @@ def water_air_mixing_ratio(actual_vapor_pressure, barometric_air_pressure):
     """
     return WATER_AIR_MWR * actual_vapor_pressure / (barometric_air_pressure - actual_vapor_pressure)
 
-def virtual_temperature(temperature, barometric_air_pressure):
+def potential_temperature(temperature, barometric_air_pressure):
     """
-    Virtual temperature in K, from temperature in K and air pressure in kPa.
+    Potential temperature in K, from temperature in K and air pressure in kPa.
     """
     return temperature * (REFERENCE_PRESSURE / barometric_air_pressure)**R_CP
 
-def virtual_potential_temperature(virtual_temperature, mixing_ratio, approximate = False):
+def virtual_potential_temperature(potential_temperature, mixing_ratio, approximate = False):
     """
     Virtual potential temperature in K.
-    Requires virtual temperature in K and mixing ratio (dimensionless).
+    Requires potential temperature in K and mixing ratio (dimensionless).
     If `approximate`, uses a first order approximation of the exact formula
         which is valid within ~1% for mixing ratios between roughly 0.00-0.20,
         but there isn't much reason to use it.
     """
     if approximate:
-        return virtual_temperature * (1 + 0.61 * mixing_ratio)
-    return  virtual_temperature * (1 + (mixing_ratio / WATER_AIR_MWR)/(1 + mixing_ratio))
+        return potential_temperature * (1 + 0.61 * mixing_ratio)
+    return potential_temperature * (1 + (mixing_ratio / WATER_AIR_MWR))/(1 + mixing_ratio) # Was originally (mistakenly) using: (1 + (mixing_ratio / WATER_AIR_MWR)/(1 + mixing_ratio))
 
 def vpt_from_3(relative_humidity, barometric_air_pressure, temperature):
     """
@@ -65,9 +65,9 @@ def vpt_from_3(relative_humidity, barometric_air_pressure, temperature):
     avp = relative_humidity * svp # actual vapor pressure
     w = water_air_mixing_ratio(actual_vapor_pressure = avp,
                                barometric_air_pressure = barometric_air_pressure)
-    vT = virtual_temperature(temperature = temperature,
+    pT = potential_temperature(temperature = temperature,
                              barometric_air_pressure = barometric_air_pressure)
-    vpT = virtual_potential_temperature(virtual_temperature = vT,
+    vpT = virtual_potential_temperature(potential_temperature = pT,
                                         mixing_ratio = w,
                                         approximate = False)
     return vpT

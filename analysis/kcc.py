@@ -234,6 +234,7 @@ def get_weather_data(start_time, end_time):
     }, inplace=True)
     cid['time'] = pd.to_datetime(cid['time']).dt.tz_localize('UTC').dt.tz_convert(LOCAL_TIMEZONE)
     cid = preprocess.convert_dataframe_units(cid, from_units = CID_UNITS, gravity = LOCAL_GRAVITY, silent = True)
+    cid = preprocess.correct_directions(cid) # Directions where speed is 0 should be set to NaN
     cid = cid[(cid['time'] <= end_time) & (cid['time'] >= start_time)].reset_index(drop = True)
     return cid
 

@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+from matplotlib import cm
 import pandas as pd
 import numpy as np
 import os
@@ -10,7 +11,11 @@ from windprofiles.plotting import change_luminosity
 import datetime
 from astral import LocationInfo
 from astral.sun import sun
+import windrose
 from kcc_definitions import LATITUDE, LONGITUDE
+
+ROSE_HEIGHT = 10
+ROSE_BINS = [0,0.89,2.24,3.13,4.47,6.71,8.94]
 
 COLORS_POSTER = {
     'open' : '#1f77b4',
@@ -52,7 +57,7 @@ MARKERS = {
 }
 
 HEIGHTS = [6, 10, 20, 32, 106] # Heights that we are concerned with for plotting, in meters. 80m is left out here.
-ZVALS = np.linspace(0.,130.,400) # Linspace for plotting heights
+ZVALS = np.linspace(0.,157.5,400) # Linspace for plotting heights
 TERRAINS = ['open', 'complex']
 LOCATION = LocationInfo(name = 'KCC tower', region = 'IA, USA', timezone = 'US/Central', latitude = LATITUDE, longitude = LONGITUDE)
 
@@ -76,7 +81,7 @@ CENTERDATES = { # Solstices/equinoxes in 2018
     'summer' : datetime.date(2018, 6, 21)
 }
 
-def bar_stability(df, summary, size, saveto, poster, details):
+def bar_stability(df, cid, summary, size, saveto, poster, details):
     COLORS = COLORS_POSTER if poster else COLORS_FORMAL
     fig, ax = plt.subplots(figsize = size, linewidth = 5*poster, edgecolor = 'k')
     stability_percents = 100 * df['stability'].value_counts(normalize = True)
@@ -105,7 +110,7 @@ def bar_stability(df, summary, size, saveto, poster, details):
     plt.savefig(saveto, bbox_inches = 'tight', edgecolor = fig.get_edgecolor())
     return
 
-def annual_profiles(df, summary, size, saveto, poster, details):
+def annual_profiles(df, cid, summary, size, saveto, poster, details):
     COLORS = COLORS_POSTER if poster else COLORS_FORMAL
     fig, axs = plt.subplots(1, 2, figsize = size, sharey = True, linewidth = 5*poster, edgecolor = 'k')
     if summary['stability_classes'] == 4:
@@ -118,7 +123,9 @@ def annual_profiles(df, summary, size, saveto, poster, details):
         ax = axs[i]
         dft = df[df['terrain'] == tc]
         for sc in stabilities:
-            short = ''.join([sub[0] for sub in sc.title().split(' ')])
+            short = sc.title()
+            ax.set_ylim((-7.5,167.5))
+            #short = ''.join([sub[0] for sub in sc.title().split(' ')])
             dfs = dft[dft['stability'] == sc]
             means = dfs[[f'ws_{h}m' for h in HEIGHTS]].mean(axis = 0).values
             mult, wsc = stats.power_fit(HEIGHTS, means)
@@ -139,7 +146,7 @@ def annual_profiles(df, summary, size, saveto, poster, details):
     plt.savefig(saveto, bbox_inches = 'tight', edgecolor = fig.get_edgecolor())
     return
 
-def wse_histograms(df, summary, size, saveto, poster, details):
+def wse_histograms(df, cid, summary, size, saveto, poster, details):
     COLORS = COLORS_POSTER if poster else COLORS_FORMAL
     if summary['stability_classes'] == 4:
         stabilities = ['unstable', 'neutral', 'stable', 'strongly stable']
@@ -192,7 +199,7 @@ def wse_histograms(df, summary, size, saveto, poster, details):
     plt.savefig(saveto, bbox_inches = 'tight', edgecolor = fig.get_edgecolor())
     return
 
-def veer_profiles(df, summary, size, saveto, poster, details):
+def veer_profiles(df, cid, summary, size, saveto, poster, details):
     COLORS = COLORS_POSTER if poster else COLORS_FORMAL
     fig, axs = plt.subplots(1, 2, figsize = size, sharey = True, linewidth = 5*poster, edgecolor = 'k')
     if summary['stability_classes'] == 4:
@@ -211,8 +218,11 @@ def veer_profiles(df, summary, size, saveto, poster, details):
             ax.scatter(means, HEIGHTS, label = sc.title(), zorder = 5, s = 75, marker = MARKERS[sc], facecolors = 'none', edgecolors = COLORS[sc], linewidths = 1.5)
         ax.set_xlabel('Mean Wind Direction (degrees)')
         if i == 0:
+            ax.set_xlim(125, 175)
             ax.set_ylabel('Height (m)')
             ax.legend(loc = 'lower right')
+        elif i == 1:
+            ax.set_xlim(295, 345)
         if poster:
             tc_title = (r'Open Terrain (${openL}-{openR}\degree$ at {h}m)'.format(openL = int(135 - summary['terrain_window_width_degrees']/2), openR = int(135 + summary['terrain_window_width_degrees']/2), h = summary['terrain_wind_height_meters'])
                     if tc == 'open'
@@ -224,7 +234,7 @@ def veer_profiles(df, summary, size, saveto, poster, details):
     fig.tight_layout()
     plt.savefig(saveto, bbox_inches = 'tight', edgecolor = fig.get_edgecolor())
 
-def tod_wse(df, summary, size, saveto, poster, details):
+def tod_wse(df, cid, summary, size, saveto, poster, details):
     OFFSET = 0.15
     COLORS = COLORS_POSTER if poster else COLORS_FORMAL
     fig, axs = plt.subplots(nrows = summary['stability_classes'], ncols = 1, figsize = size, sharex = True, linewidth = 5*poster, edgecolor = 'k')
@@ -272,7 +282,7 @@ def tod_wse(df, summary, size, saveto, poster, details):
 import matplotlib.pyplot as plt
 import pandas as pd
 
-def data_gaps(df, summary, size, saveto, poster, details):
+def data_gaps(df, cid, summary, size, saveto, poster, details):
     # Full range of data after quality control, to show what specific times are covered by the analysis
     COLORS = COLORS_POSTER if poster else COLORS_FORMAL
     fig, ax = plt.subplots(figsize=size, linewidth=5*poster, edgecolor='k')
@@ -311,7 +321,7 @@ def data_gaps(df, summary, size, saveto, poster, details):
 
     return
 
-def terrain_breakdown(df, summary, size, saveto, poster, details):
+def terrain_breakdown(df, cid, summary, size, saveto, poster, details):
     COLORS = COLORS_POSTER if poster else COLORS_FORMAL
     fig, ax = plt.subplots(figsize = size)
     breakdown, proportions = get_monthly_breakdown(df, 'terrain')
@@ -334,14 +344,36 @@ def terrain_breakdown(df, summary, size, saveto, poster, details):
     plt.savefig(saveto, bbox_inches = 'tight', edgecolor = fig.get_edgecolor())
     return
 
+def windrose_comparison(df, cid, summary, size, saveto, poster, details):
+    COLORS = COLORS_POSTER if poster else COLORS_FORMAL
+    fig, axs = plt.subplots(ncols = 2, figsize = size, linewidth = 5*poster, edgecolor = 'k', subplot_kw = {'projection': 'windrose'})    
+    # first, KCC
+    speeds_kcc = df[f'ws_{ROSE_HEIGHT}m']
+    directions_kcc = df[f'wd_{ROSE_HEIGHT}m']
+    axs[0].bar(directions_kcc, speeds_kcc, normed = True, opening = 1.0, bins = ROSE_BINS, edgecolor = 'white', cmap = cm.rainbow, nsector = 36)
+    axs[0].set_title('KCC', y = 1.05)
+    axs[0].set_legend()
+    axs[0].set_ylim((0,6.7))
+    # now, CID
+    speeds_cid = cid['ws_0m']
+    directions_cid = cid['wd_0m']
+    axs[1].bar(directions_cid, speeds_cid, normed = True, opening = 1.0, bins = ROSE_BINS, edgecolor = 'white', cmap = cm.rainbow, nsector = 36)
+    axs[1].set_title('CID', y = 1.05)
+    axs[1].set_legend()
+    axs[1].set_ylim((0,6.7))
+    fig.tight_layout()
+    plt.savefig(saveto, bbox_inches = 'tight', edgecolor = fig.get_edgecolor())
+    return
+
 ALL_PLOTS = {
     'bar_stability': ('Stability Frequency Bar Plot', bar_stability, (4,3)),
     'annual_profiles' : ('Annual Wind Profiles with Fits, by Terrain', annual_profiles, (6.5,3)),
     'wse_histograms' : ('Histograms of WSE, by Stability, including Terrain', wse_histograms, (6.5,4.5)),
     'veer_profiles' : ('Wind direction profiles, by Terrain', veer_profiles, (6.5,3)),
     'tod_wse' : ('Time of Day Plots of WSE, by Terrain, including Stability & Fits', tod_wse, (6.5,6)),
-    'data_gaps' : ('Data Gap Visualization', data_gaps, (6.5,4)),
-    'terrain_breakdown' : ('Breakdown of Terrain Characterizations, by Month', terrain_breakdown, (6.5,4.5))
+    'data_gaps' : ('Data Gap Visualization', data_gaps, (6.5,3)),
+    'terrain_breakdown' : ('Breakdown of Terrain Characterizations, by Month', terrain_breakdown, (6.5,4.5)),
+    'windrose_comparison' : ('KCC/CID Wind Rose Comparison', windrose_comparison, (6.5,3))
 }
 
 def list_possible_plots():
@@ -349,9 +381,16 @@ def list_possible_plots():
     for tag in ALL_PLOTS.keys():
         print(f'\t{tag}')
 
-JUSTONE = 'data_gaps'
+JUSTONE = None #'windrose_comparison'# None #'windrose_comparison' # None #'data_gaps'
 
-def generate_plots(df: pd.DataFrame, savedir: str, summary: dict, which: list = [JUSTONE] if JUSTONE is not None else ALL_PLOTS.keys(), poster: bool = False, details: bool = False, **kwargs):
+def generate_plots(df: pd.DataFrame, cid: pd.DataFrame, savedir: str, summary: dict, which: list = [JUSTONE] if JUSTONE is not None else ALL_PLOTS.keys(), poster: bool = False, details: bool = False, **kwargs):
+    for sc in df['stability'].unique():
+        print(sc)
+        dfs = df[df['stability'] == sc]
+        N = len(dfs[dfs['alpha'] < 0])
+        print(N)
+        print(N/len(dfs))
+    
     plt.rcParams['font.size'] = 13 if poster else 14
     plt.rcParams['font.family'] = 'sans-serif' if poster else 'serif'
     plt.rcParams['mathtext.fontset'] = 'dejavusans' if poster else 'stix'
@@ -364,7 +403,7 @@ def generate_plots(df: pd.DataFrame, savedir: str, summary: dict, which: list = 
         long, plotter, size = ALL_PLOTS[tag]
         print(f"Generating plot {tag}: '{long}'")
         size = (2*size[0],2*size[1])
-        plotter(df = df, summary = summary, size = size, saveto = f'{fig_savedir}/{tag}.png', poster = poster, details = details)
+        plotter(df = df, cid = cid, summary = summary, size = size, saveto = f'{fig_savedir}/{tag}.png', poster = poster, details = details)
         not_generated.remove(tag)
     if len(not_generated) != 0:
         print(f'Plots not generated: {not_generated}') 

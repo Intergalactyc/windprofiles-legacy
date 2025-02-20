@@ -176,6 +176,18 @@ def convert_dataframe_units(df, from_units, gravity = atmos.STANDARD_GRAVITY, si
 
     return result
 
+def correct_directions(df):
+    result = df.copy()
+    for col in result.columns:
+        if col[:3] == 'wd_':
+            h = col[3]
+            ws_col = f'ws_{h}m'
+            if ws_col in result.columns:
+                result.loc[result[ws_col] == 0, col] = pd.NA
+            else:
+                print(f'Could not locate column {ws_col}')
+    return result
+
 def clean_formatting(df, type = 'float32', silent = False):
     """
     At times when wind speed for a certain height
