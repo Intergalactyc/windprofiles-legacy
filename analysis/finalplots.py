@@ -311,7 +311,7 @@ def data_gaps(df, cid, summary, size, saveto, poster, details):
     # Set x-axis grid at the start of each month
     month_starts = pd.date_range(start=start, end=end, freq='MS')  # 'MS' = Month Start
     ax.set_xticks(month_starts)
-    ax.set_xticklabels([f"{MONTHS[d.month - 1]}{(' \'' + str(d.year)[2:]) if (i==0 or month_starts[i].year != month_starts[i-1].year) else ''}" for i, d in enumerate(month_starts)])
+    ax.set_xticklabels([f"{MONTHS[d.month - 1]}{str(d.year) if (i==0 or month_starts[i].year != month_starts[i-1].year) else ''}" for i, d in enumerate(month_starts)])
     ax.xaxis.grid(True, linestyle='--', alpha=0.6)
     ax.set_xlabel('Time')
 
