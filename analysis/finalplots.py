@@ -125,12 +125,23 @@ def annual_profiles(df, cid, summary, size, saveto, poster, details):
         for sc in stabilities:
             short = sc.title()
             ax.set_ylim((-7.5,167.5))
-            #short = ''.join([sub[0] for sub in sc.title().split(' ')])
             dfs = dft[dft['stability'] == sc]
-            means = dfs[[f'ws_{h}m' for h in HEIGHTS]].mean(axis = 0).values
-            mult, wsc = stats.power_fit(HEIGHTS, means)
-            ax.plot(mult * ZVALS**wsc, ZVALS, color = change_luminosity(COLORS[sc], 0.85), zorder = 0)
-            ax.scatter(means, HEIGHTS, label = r'{sc}: $u(z)={a:.2f}z^{{{b:.3f}}}$'.format(sc=short,a=mult,b=wsc), color = COLORS[sc], zorder = 5, s = 75, marker = MARKERS[sc])
+
+            zorder = 0
+            def plot_fit(heights, linestyle, scatter = False): # linestyle can be 'solid', 'dashed', 'dotted', 'dashdot', or a parameterization tuple
+                nonlocal zorder
+                means = dfs[[f'ws_{h}m' for h in heights]].mean(axis = 0).values
+                mult, wsc = stats.power_fit(heights, means)
+                ax.plot(mult * ZVALS**wsc, ZVALS, color = change_luminosity(COLORS[sc], 0.85), zorder = zorder, linestyle = linestyle)
+                zorder += 2
+                if scatter: # enable this for the full line
+                    ax.scatter(means, HEIGHTS, label = r'{sc}: $u(z)={a:.2f}z^{{{b:.3f}}}$'.format(sc=short,a=mult,b=wsc), color = COLORS[sc], zorder = 6, s = 75, marker = MARKERS[sc])
+
+            plot_fit(heights = HEIGHTS, linestyle = 'solid', scatter = True) # full (5-height) fit line
+            #plot_fit(heights = [6, 10], linestyle = 'dashed') # 2 lowest heights only "Ex 1"
+            #plot_fit(heights = [10, 106], linestyle = 'dashed') # 2 key heights (10 & 106 meters) only "Ex 2"
+            #plot_fit(heights = [6, 10, 20, 32], linestyle = 'dashed') # all heights except for 106 meters (6 - 32) "Ex 3"
+            
         ax.set_xlabel('Mean Wind Speed (m/s)')
         if i == 0: ax.set_ylabel('Height (m)')
         if poster:
@@ -346,24 +357,44 @@ def terrain_breakdown(df, cid, summary, size, saveto, poster, details):
 
 def windrose_comparison(df, cid, summary, size, saveto, poster, details):
     COLORS = COLORS_POSTER if poster else COLORS_FORMAL
-    fig, axs = plt.subplots(ncols = 2, figsize = size, linewidth = 5*poster, edgecolor = 'k', subplot_kw = {'projection': 'windrose'})    
-    # first, KCC
+    fig, axs = plt.subplots(ncols=2, figsize=size, linewidth=5*poster, edgecolor='k', subplot_kw={'projection': 'windrose'})    
+    
+    # Custom legend labels
+    speed_bins = ROSE_BINS
+    cmap = cm.rainbow  # Color map used for bins
+    colors = [cmap(i / len(speed_bins)) for i in range(len(speed_bins))]
+
+    # First, KCC
     speeds_kcc = df[f'ws_{ROSE_HEIGHT}m']
     directions_kcc = df[f'wd_{ROSE_HEIGHT}m']
-    axs[0].bar(directions_kcc, speeds_kcc, normed = True, opening = 1.0, bins = ROSE_BINS, edgecolor = 'white', cmap = cm.rainbow, nsector = 36)
-    axs[0].set_title('KCC', y = 1.05)
-    axs[0].set_legend()
-    axs[0].set_ylim((0,6.7))
-    # now, CID
+    axs[0].bar(directions_kcc, speeds_kcc, normed=True, opening=1.0,
+               bins=speed_bins, edgecolor='white', cmap=cmap, nsector=36)
+    axs[0].set_title('KCC', y=1.075)
+
+    # Now, CID
     speeds_cid = cid['ws_0m']
     directions_cid = cid['wd_0m']
-    axs[1].bar(directions_cid, speeds_cid, normed = True, opening = 1.0, bins = ROSE_BINS, edgecolor = 'white', cmap = cm.rainbow, nsector = 36)
-    axs[1].set_title('CID', y = 1.05)
-    axs[1].set_legend()
-    axs[1].set_ylim((0,6.7))
+    axs[1].bar(directions_cid, speeds_cid, normed=True, opening=1.0,
+               bins=speed_bins, edgecolor='white', cmap=cmap, nsector=36)
+    axs[1].set_title('CID', y=1.075)
+
+    # Ensure both plots have the same radial ticks by getting ticks from one axis
+    tick_values = np.linspace(0, axs[0].get_ylim()[1], num=5)
+    for ax in axs:
+        ax.set_yticks(tick_values, ['' if value == 0 else f'{value:.1f}%' for value in tick_values])
+    
+    # Decrease the gap between the subplots
+    fig.subplots_adjust(wspace=-0.55)  # Adjust the value as needed
+    
+    # Custom legend - moved to the left side
+    legend_labels = [f"{speed_bins[i]}-{speed_bins[i+1]} m/s" for i in range(len(speed_bins)-1)]
+    patches = [plt.Line2D([0], [0], color=colors[i], lw=5) for i in range(len(legend_labels))]
+    fig.legend(patches, legend_labels, title="Wind Speed (m/s)", loc='center left', bbox_to_anchor=(-0.1, 0.5), ncol=1)
+    
     fig.tight_layout()
-    plt.savefig(saveto, bbox_inches = 'tight', edgecolor = fig.get_edgecolor())
+    plt.savefig(saveto, bbox_inches='tight', edgecolor=fig.get_edgecolor())
     return
+
 
 ALL_PLOTS = {
     'bar_stability': ('Stability Frequency Bar Plot', bar_stability, (4,3)),
@@ -381,16 +412,15 @@ def list_possible_plots():
     for tag in ALL_PLOTS.keys():
         print(f'\t{tag}')
 
-JUSTONE = None #'windrose_comparison'# None #'windrose_comparison' # None #'data_gaps'
+JUSTONE = None #'windrose_comparison'
 
 def generate_plots(df: pd.DataFrame, cid: pd.DataFrame, savedir: str, summary: dict, which: list = [JUSTONE] if JUSTONE is not None else ALL_PLOTS.keys(), poster: bool = False, details: bool = False, **kwargs):
-    for sc in df['stability'].unique():
-        print(sc)
-        dfs = df[df['stability'] == sc]
-        N = len(dfs[dfs['alpha'] < 0])
-        print(N)
-        print(N/len(dfs))
-    
+    # for sc in df['stability'].unique():
+    #     print(sc)
+    #     dfs = df[df['stability'] == sc]
+    #     N = len(dfs[dfs['alpha'] < 0])
+    #     print(N)
+    #     print(N/len(dfs))
     plt.rcParams['font.size'] = 13 if poster else 14
     plt.rcParams['font.family'] = 'sans-serif' if poster else 'serif'
     plt.rcParams['mathtext.fontset'] = 'dejavusans' if poster else 'stix'
