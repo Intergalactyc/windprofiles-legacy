@@ -23,7 +23,8 @@ RULES = {
     'resampling_window_minutes' : 10,
     'stability_classes' : 4,
     'terrain_window_width_degrees' : 60,
-    'terrain_wind_height_meters' : 10
+    'terrain_wind_height_meters' : 10,
+    'turbulence_method_local' : False, # For finding pseudo-TI (pti). if True, divide by local (at height) mean speed; if False, divide by reference (106m) mean speed
 }
 
 def load_data(data_directory: str, outer_merges: bool = False):
@@ -93,7 +94,8 @@ def perform_preprocessing(df,
                           resampling_window,
                           storm_events = None,
                           weather_data = None,
-                          storm_removal = False):
+                          storm_removal = False,
+                          turbulence_local = True):
     print("START DATA PREPROCESSING")
     
     doWeather = not(storm_events is None or weather_data is None)
@@ -137,8 +139,9 @@ def perform_preprocessing(df,
     df = preprocess.resample(df = df,
                             window_size_minutes = resampling_window,
                             how = 'mean',
-                            all_heights = HEIGHTS,)
-                            # deviations = [f'ws_{h}m' for h in HEIGHTS])
+                            all_heights = HEIGHTS,
+                            pti = True, # do compute pseudo-turbulence-intensity (pseudo-TI or pti)
+                            turbulence_reference = -1 if turbulence_local else 106) # -1 indicates local
 
     # Remove rows where there isn't enough data (not enough columns, or missing either 10m or 106m data)
     df = preprocess.strip_missing_data(df = df,
@@ -355,7 +358,8 @@ if __name__ == '__main__':
             resampling_window = RULES['resampling_window_minutes'], # Duration, in minutes, of resampling window
             storm_events = storm_events,
             weather_data = cid_data,
-            storm_removal = RULES['storm_removal'] # discard stormy data?
+            storm_removal = RULES['storm_removal'], # discard stormy data?
+            turbulence_local = RULES['turbulence_method_local'] # use local normalization or base on 106m reference height?
         )
 
         # Define 3-class bulk Richardson number stability classification scheme

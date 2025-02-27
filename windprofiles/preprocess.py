@@ -350,7 +350,9 @@ def resample(df: pd.DataFrame,
              all_heights: list[int],
              window_size_minutes: int,
              how: str = 'mean',
-             silent: bool = False) -> pd.DataFrame:
+             silent: bool = False,
+             pti: bool = False,
+             turbulence_reference: int = -1) -> pd.DataFrame:
     
     to_resample = df.copy(deep = True)
     easy_cols = ['t', 'p', 'rh']
@@ -360,18 +362,28 @@ def resample(df: pd.DataFrame,
         dirRad = np.deg2rad(to_resample[f'wd_{h}m'])
         to_resample[f'x_{h}m'], to_resample[f'y_{h}m'] = polar.wind_components(to_resample[f'ws_{h}m'], to_resample[f'wd_{h}m'])
     
+    rsmp = to_resample.resample(window)
     if how == 'mean':
-        resampled = to_resample.resample(window).mean()
+        resampled = rsmp.mean()
     elif how == 'median':
-        resampled = to_resample.resample(window).median()
+        resampled = rsmp.median()
     else:
         raise Exception(f'preprocess.resample: Unrecognized resampling method {how}')
+    if pti: stds = rsmp.std()
     
     before_drop = resampled.shape[0]
     resampled.dropna(axis = 0, how = 'all', inplace = True)
     dropped = before_drop - resampled.shape[0]
 
     for h in all_heights:
+        if pti:
+            # Compute pseudo-turbulence intensities 'pti_{h}m' per height as (mean of wind speeds) / (mean wind speed [direct magnitude average])
+                # mean wind speed used is that at height `turbulence_reference` (or at local height if turbulence_reference == -1)
+            ref = h if (type(turbulence_reference) is not int or turbulence_reference < 0) else turbulence_reference
+            if ref not in all_heights:
+                raise Exception(f'preprocess.resample: in pseudo-TI calculation, unrecognized reference height {ref}m')
+            resampled[f'pti_{h}m'] = stds[f'ws_{h}m'] / resampled[f'ws_{ref}m']
+        # Find vector averages
         resampled[f'ws_{h}m'] = np.sqrt(resampled[f'x_{h}m']**2+resampled[f'y_{h}m']**2)
         resampled[f'wd_{h}m'] = (np.rad2deg(np.arctan2(resampled[f'x_{h}m'], resampled[f'y_{h}m'])) + 360) % 360
         resampled.drop(columns=[f'x_{h}m',f'y_{h}m'], inplace=True)
