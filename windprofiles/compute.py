@@ -163,3 +163,41 @@ def power_law_fits(df: pd.DataFrame, heights: list[int], minimum_present: int = 
         print(f'\tCompleted computation, multiplicative coefficient stored in {columns[0]} and exponent stored in {columns[1]}')
 
     return result
+
+def gusts(df: pd.DataFrame, heights: list[int], silent: bool = False):
+    """
+    Uses maxws_{h}m columns to compute raw gust factors gust_{h}m,
+    which are max (from resampling) / mean wind speeds, an estimate of the true gust factors
+    (higher presample frequency and sample interval length -> better estimate)
+    """
+    if not silent:
+        print(f'compute.gusts() - computing gust factor estimates based on presampling sample-interval maximums and means')
+
+    result = df.copy()
+
+    for h in heights:
+        result[f'gust_{h}m'] = result[f'maxws_{h}m'] / result[f'ws_{h}m'] # little oopsie if ws_{h}m is 0, but doesn't encounter that
+
+    if not silent:
+        print(f'\tCompleted gust factor calculations')
+
+    return result
+
+def ti_correction(df: pd.DataFrame, heights: list[int], factor: float, silent: bool = False):
+    """
+    Given a (sonic-derived or otherwise estimated) correction factor, multiplies pseudo-TI values (pti)
+    by that factor in order to approximate true turbulence intensity values
+    """
+
+    if not silent:
+        print(f'compute.ti_correction() - computing corrected turbulence intensities based on pseudo-TI with correction factor {factor:.4f}')
+
+    result = df.copy()
+    
+    for h in heights:
+        result[f'TI_{h}m'] = result[f'pti_{h}m'] * factor
+
+    if not silent:
+        print(f'\tCompleted TI corrections')
+
+    return result

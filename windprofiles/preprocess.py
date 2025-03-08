@@ -369,7 +369,9 @@ def resample(df: pd.DataFrame,
         resampled = rsmp.median()
     else:
         raise Exception(f'preprocess.resample: Unrecognized resampling method {how}')
-    if pti: stds = rsmp.std()
+    maxs = rsmp.max()
+    if pti:
+        stds = rsmp.std()
     
     before_drop = resampled.shape[0]
     resampled.dropna(axis = 0, how = 'all', inplace = True)
@@ -382,7 +384,11 @@ def resample(df: pd.DataFrame,
             ref = h if (type(turbulence_reference) is not int or turbulence_reference < 0) else turbulence_reference
             if ref not in all_heights:
                 raise Exception(f'preprocess.resample: in pseudo-TI calculation, unrecognized reference height {ref}m')
-            resampled[f'pti_{h}m'] = stds[f'ws_{h}m'] / resampled[f'ws_{ref}m']
+            resampled[f'pti_{h}m'] = stds[f'ws_{h}m'] / resampled[f'ws_{ref}m'] # divide by raw average wind speed, before vector averaging
+        
+        # Get maximum wind speed in each interval
+        resampled[f'maxws_{h}m'] = maxs[f'ws_{h}m']
+
         # Find vector averages
         resampled[f'ws_{h}m'] = np.sqrt(resampled[f'x_{h}m']**2+resampled[f'y_{h}m']**2)
         resampled[f'wd_{h}m'] = (np.rad2deg(np.arctan2(resampled[f'x_{h}m'], resampled[f'y_{h}m'])) + 360) % 360

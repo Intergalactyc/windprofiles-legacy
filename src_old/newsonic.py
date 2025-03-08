@@ -1,10 +1,12 @@
+# broken
+
 ### newsonic.py ###
 # Elliott Walker #
 # Last update: 14 December 2024 #
 # Analysis of the snippet of sonic data #
 
 # sample usage:
-# python newsonic.py -n 8 --data="../../data/KCC_FluxData_106m_SAMPLE" --output="../../outputs/sonic_sample" --match="../../outputs/slow/ten_minutes_labeled.csv" --slow="../../outputs/slow/combined.csv"
+# python newsonic.py -n 8 --data="C:/Users/22wal/OneDrive/GLWind/data/KCC_FluxData" --output="C:/Users/22wal/OneDrive/GLWind/results/sonic" --match="../../outputs/slow/ten_minutes_labeled.csv" --slow="../../outputs/slow/combined.csv"
 
 import pandas as pd
 import numpy as np
