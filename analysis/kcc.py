@@ -137,13 +137,12 @@ def perform_preprocessing(df,
     df = preprocess.resample(df = df,
                             window_size_minutes = resampling_window,
                             how = 'mean',
-                            all_heights = HEIGHTS,)
-                            # deviations = [f'ws_{h}m' for h in HEIGHTS])
+                            all_heights = HEIGHTS)
 
     # Remove rows where there isn't enough data (not enough columns, or missing either 10m or 106m data)
     df = preprocess.strip_missing_data(df = df,
-                                    necessary = [10, 106],
-                                    minimum = 3)
+                                    necessary = [6, 10, 106],
+                                    minimum = 4)
     
     if doWeather:
         print('Matching reported weather events...')

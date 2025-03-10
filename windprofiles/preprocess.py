@@ -359,7 +359,7 @@ def resample(df: pd.DataFrame,
     for h in all_heights:
         dirRad = np.deg2rad(to_resample[f'wd_{h}m'])
         to_resample[f'x_{h}m'], to_resample[f'y_{h}m'] = polar.wind_components(to_resample[f'ws_{h}m'], to_resample[f'wd_{h}m'])
-    
+
     if how == 'mean':
         resampled = to_resample.resample(window).mean()
     elif how == 'median':
