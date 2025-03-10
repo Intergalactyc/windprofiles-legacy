@@ -15,7 +15,6 @@ import windrose
 from kcc_definitions import LATITUDE, LONGITUDE
 
 ROSE_HEIGHT = 10
-ROSE_BINS = [0,0.89,2.24,3.13,4.47,6.71,8.94]
 
 COLORS_POSTER = {
     'open' : '#1f77b4',
@@ -57,7 +56,9 @@ MARKERS = {
 }
 
 HEIGHTS = [6, 10, 20, 32, 106] # Heights that we are concerned with for plotting, in meters. 80m is left out here.
+HEIGHTS_GAPS = [6, 10, 20, 32, 80, 106] # Every height (HEIGHTS but with 80 as well), for the data gaps visualization
 ZVALS = np.linspace(0.,157.5,400) # Linspace for plotting heights
+UVALS = np.linspace(0, 17, 360) # Linspace for plotting wind speed distributions
 TERRAINS = ['open', 'complex']
 LOCATION = LocationInfo(name = 'KCC tower', region = 'IA, USA', timezone = 'US/Central', latitude = LATITUDE, longitude = LONGITUDE)
 
@@ -80,6 +81,9 @@ CENTERDATES = { # Solstices/equinoxes in 2018
     'spring' : datetime.date(2018, 3, 20),
     'summer' : datetime.date(2018, 6, 21)
 }
+
+GAPS_LINEAR = False # Show data_gaps plot with a linear y scale?
+DISTS_BY_TERRAIN = True # Show separate terrain classes in speed_distributions?
 
 def bar_stability(df, cid, summary, size, saveto, poster, details):
     COLORS = COLORS_POSTER if poster else COLORS_FORMAL
@@ -249,7 +253,6 @@ def tod_wse(df, cid, summary, size, saveto, poster, details):
     OFFSET = 0.15
     COLORS = COLORS_POSTER if poster else COLORS_FORMAL
     fig, axs = plt.subplots(nrows = summary['stability_classes'], ncols = 1, figsize = size, sharex = True, linewidth = 5*poster, edgecolor = 'k')
-    fig.tight_layout()
     if summary['stability_classes'] == 4:
         stabilities = ['unstable', 'neutral', 'stable', 'strongly stable']
     elif summary['stability_classes'] == 3:
@@ -258,7 +261,7 @@ def tod_wse(df, cid, summary, size, saveto, poster, details):
         raise Exception(f"Cannot handle {summary['stability_classes']} stability classes in plot 'tod_wse'")
     for i, ssn in enumerate(['fall','winter','spring','summer']):
         ax = axs[i]
-        ax.set_ylim(0,0.7)
+        ax.set_ylim(0,0.725)
         mons = SEASONS[ssn]
         monnums = [MONTHS.index(m)+1 for m in mons]
         dfs = df[df['time'].dt.month.isin(monnums)]
@@ -274,12 +277,14 @@ def tod_wse(df, cid, summary, size, saveto, poster, details):
                 print(f'\t{ssn} alpha = {params[0]:.4f} * sin({params[1]:.4f} * t + {params[2]:.4f}) + {params[3]:.4f}')
             xplot = np.linspace(0, 24, 120)
             ax.plot(xplot+OFFSET*j, fitsine(xplot), color = COLORS[tc], linestyle = 'dashed', alpha = 0.75)
+            fit_label = r'$\alpha = {A:.3f}\cdot\sin ({f:.3f}t+{b:.3f})+{h:.3f}$'.format(A=params[0], f=params[1], b = params[2], h = params[3])
+            ax.text(0.49, 0.84-0.11*j, s = fit_label, size = 'large', horizontalalignment = 'center', verticalalignment = 'top', color = change_luminosity(COLORS[tc], 1.15), transform = ax.transAxes)
         ax.set_ylabel(r'$\alpha$')
         ax.set_title(SEASON_STRINGS[ssn], loc = 'center', y = 0.85)
         s = sun(LOCATION.observer, date = CENTERDATES[ssn], tzinfo = LOCATION.timezone)
         ax.vlines([time_to_hours(s['sunrise']), time_to_hours(s['sunset'])], linestyle = 'dashed', ymin = ax.get_ylim()[0], ymax = ax.get_ylim()[1], color = 'green')
         if i == 0:
-            ax.legend()
+            ax.legend(loc = 'upper left')
         elif i == 3:
             major_tick_locations = np.array(range(0,25,6)) + OFFSET*j/2
             major_tick_labels = [6*i for i in range(4)] + [0]
@@ -287,11 +292,9 @@ def tod_wse(df, cid, summary, size, saveto, poster, details):
             ax.set_xticks(np.array(range(24)) + OFFSET*j/2, range(24), minor = True, size = 10)
             ax.set_xlabel('Local time (hours)')
     if poster: fig.suptitle('Wind Shear Exponent Medians by Time of Day', y = 1)
+    fig.tight_layout()
     plt.savefig(saveto, bbox_inches = 'tight', edgecolor = fig.get_edgecolor())
     return
-
-import matplotlib.pyplot as plt
-import pandas as pd
 
 def data_gaps(df, cid, summary, size, saveto, poster, details):
     # Full range of data after quality control, to show what specific times are covered by the analysis
@@ -308,21 +311,23 @@ def data_gaps(df, cid, summary, size, saveto, poster, details):
     ax.scatter(gaps, [0 for _ in gaps], s=2.5, c=COLORS['unavailable'])
 
     # Plot available data at each height
-    for i, h in enumerate(HEIGHTS, 1):
+    for i, h in enumerate(HEIGHTS_GAPS, 1):
         available = df[~pd.isna(df[f'ws_{h}m'])]['time']
-        ax.scatter(available, [i for _ in available], s=2.5, c=COLORS['available'])
+        ax.scatter(available, [(h if GAPS_LINEAR else i) for _ in available], s=2.5, c=COLORS['available'])
 
     # Set y-axis labels and grid
-    # ax.set_yscale('log')
-    ax.set_yticks(range(len(HEIGHTS) + 1))
-    ax.set_yticklabels(['No Data'] + [f"{h}m" for h in HEIGHTS])
+    if GAPS_LINEAR:
+        ax.set_yticks([0] + HEIGHTS_GAPS)
+    else:
+        ax.set_yticks(range(len(HEIGHTS_GAPS) + 1))
+    ax.set_yticklabels(['No Data'] + [f"{h}m" for h in HEIGHTS_GAPS])
     ax.yaxis.grid(True, linestyle='--', alpha=0.6)
     ax.set_ylabel('Boom Height')
 
     # Set x-axis grid at the start of each month
     month_starts = pd.date_range(start=start, end=end, freq='MS')  # 'MS' = Month Start
     ax.set_xticks(month_starts)
-    ax.set_xticklabels([f"{MONTHS[d.month - 1]}{str(d.year) if (i==0 or month_starts[i].year != month_starts[i-1].year) else ''}" for i, d in enumerate(month_starts)])
+    ax.set_xticklabels([f"{MONTHS[d.month - 1]}{(' ' + str(d.year)) if (i==0 or month_starts[i].year != month_starts[i-1].year) else ''}" for i, d in enumerate(month_starts)])
     ax.xaxis.grid(True, linestyle='--', alpha=0.6)
     ax.set_xlabel('Time')
 
@@ -334,7 +339,7 @@ def data_gaps(df, cid, summary, size, saveto, poster, details):
 
 def terrain_breakdown(df, cid, summary, size, saveto, poster, details):
     COLORS = COLORS_POSTER if poster else COLORS_FORMAL
-    fig, ax = plt.subplots(figsize = size)
+    fig, ax = plt.subplots(figsize = size, linewidth = 5*poster, edgecolor = 'k')
     breakdown, proportions = get_monthly_breakdown(df, 'terrain')
     last = pd.Series(np.zeros(12, dtype = int))
     for tc in ['open', 'complex', 'other']:
@@ -360,22 +365,23 @@ def windrose_comparison(df, cid, summary, size, saveto, poster, details):
     fig, axs = plt.subplots(ncols=2, figsize=size, linewidth=5*poster, edgecolor='k', subplot_kw={'projection': 'windrose'})    
     
     # Custom legend labels
-    speed_bins = ROSE_BINS
-    cmap = cm.rainbow  # Color map used for bins
+    speed_bins = [0.,1.5,3.,4.5,6.,7.5,9.,1000] # 1000 in place of np.inf (unrealistically high speed value; np.inf gives a RuntimeWarning even though it works)
+    cmap = cm.rainbow_r  # Color map used for bins (note: suffix _r for reversed version)
+    # Good cmaps: jet, jet_r, gist_rainbow, coolwarm, coolwarm_r, plasma_r, viridis_r, rainbow_r, rainbow
     colors = [cmap(i / len(speed_bins)) for i in range(len(speed_bins))]
 
     # First, KCC
     speeds_kcc = df[f'ws_{ROSE_HEIGHT}m']
     directions_kcc = df[f'wd_{ROSE_HEIGHT}m']
     axs[0].bar(directions_kcc, speeds_kcc, normed=True, opening=1.0,
-               bins=speed_bins, edgecolor='white', cmap=cmap, nsector=36)
+               bins=speed_bins, edgecolor='white', colors=colors, nsector=36)
     axs[0].set_title('KCC', y=1.075)
 
     # Now, CID
     speeds_cid = cid['ws_0m']
     directions_cid = cid['wd_0m']
     axs[1].bar(directions_cid, speeds_cid, normed=True, opening=1.0,
-               bins=speed_bins, edgecolor='white', cmap=cmap, nsector=36)
+               bins=speed_bins, edgecolor='white', colors=colors, nsector=36)
     axs[1].set_title('CID', y=1.075)
 
     # Ensure both plots have the same radial ticks by getting ticks from one axis
@@ -387,7 +393,7 @@ def windrose_comparison(df, cid, summary, size, saveto, poster, details):
     fig.subplots_adjust(wspace=-0.55)  # Adjust the value as needed
     
     # Custom legend - moved to the left side
-    legend_labels = [f"{speed_bins[i]}-{speed_bins[i+1]} m/s" for i in range(len(speed_bins)-1)]
+    legend_labels = [f"{speed_bins[i]:.1f}-{speed_bins[i+1]:.1f} m/s" for i in range(len(speed_bins)-2)] + [f">{speed_bins[-2]:.1f} m/s"]
     patches = [plt.Line2D([0], [0], color=colors[i], lw=5) for i in range(len(legend_labels))]
     fig.legend(patches, legend_labels, title="Wind Speed (m/s)", loc='center left', bbox_to_anchor=(-0.1, 0.5), ncol=1)
     
@@ -395,16 +401,99 @@ def windrose_comparison(df, cid, summary, size, saveto, poster, details):
     plt.savefig(saveto, bbox_inches='tight', edgecolor=fig.get_edgecolor())
     return
 
+def pti_profiles(df, cid, summary, size, saveto, poster, details):
+    COLORS = COLORS_POSTER if poster else COLORS_FORMAL
+    fig, axs = plt.subplots(1, 2, figsize = size, sharey = True, linewidth = 5*poster, edgecolor = 'k')
+    if summary['stability_classes'] == 4:
+        stabilities = ['unstable', 'neutral', 'stable', 'strongly stable']
+    elif summary['stability_classes'] == 3:
+        stabilities = ['unstable', 'neutral', 'stable']
+    else:
+        raise Exception(f"Cannot handle {summary['stability_classes']} stability classes in plot 'annual_profiles'")
+    for i, tc in enumerate(TERRAINS):
+        ax = axs[i]
+        dft = df[df['terrain'] == tc]
+        for sc in stabilities:
+            dfs = dft[dft['stability'] == sc]
+            means = dfs[[f'pti_{h}m' for h in HEIGHTS]].mean(axis = 0).values
+            #means = [polar.unit_average_direction(dfs[f'wd_{h}m']) for h in HEIGHTS]
+            ax.plot(means, HEIGHTS, color = change_luminosity(COLORS[sc], 0.85), zorder = 0)
+            ax.scatter(means, HEIGHTS, label = sc.title(), zorder = 5, s = 75, marker = MARKERS[sc], facecolors = 'none', edgecolors = COLORS[sc], linewidths = 1.5)
+        ax.set_xlabel(r'$\sigma_{M}/\overline{M}$')
+        ax.set_xlim(0, 0.25)
+        if i == 0:
+            ax.set_ylabel('Height (m)')
+            ax.legend(loc = 'upper right')
+        if poster:
+            tc_title = (r'Open Terrain (${openL}-{openR}\degree$ at {h}m)'.format(openL = int(135 - summary['terrain_window_width_degrees']/2), openR = int(135 + summary['terrain_window_width_degrees']/2), h = summary['terrain_wind_height_meters'])
+                    if tc == 'open'
+                    else r'Complex Terrain (${complexL}-{complexR}\degree$ at {h}m)'.format(complexL = int(315 - summary['terrain_window_width_degrees']/2), complexR = int(315 + summary['terrain_window_width_degrees']/2), h = summary['terrain_wind_height_meters'])
+                )
+            ax.set_title(tc_title)
+    if poster:
+        fig.suptitle(r'Annual Profiles of $\sigma_{M}/\overline{M}$, by Terrain and Stability')
+    fig.tight_layout()
+    plt.savefig(saveto, bbox_inches = 'tight', edgecolor = fig.get_edgecolor())
+
+def speed_distributions(df, cid, summary, size, saveto, poster, details):
+    COLORS = COLORS_POSTER if poster else COLORS_FORMAL
+    fig, axs = plt.subplots(nrows = len(HEIGHTS), ncols = 1, sharex = True, figsize = size, linewidth = 5*poster, edgecolor = 'k')
+
+    N = len(HEIGHTS)
+    for i, h in enumerate(HEIGHTS,1):
+        ax = axs[N-i]
+        if details:
+            print(f'At {h} meters')
+        if DISTS_BY_TERRAIN:
+            for j, tc in enumerate(TERRAINS):
+                ws_hm = df[df['terrain'] == tc][f'ws_{h}m']
+                ws_noinf = ws_hm.replace([np.inf,-np.inf], np.nan).dropna()
+                weib, [shape, scale] = stats.fit_wind_weibull(ws_noinf)
+                if details:
+                    print('\t'+tc.title())
+                    print(f'\t\tShape parameter k = {shape:.4f}')
+                    print(f'\t\tScale parameter lambda = {scale:.4f}')
+                ax.hist(x = ws_noinf, bins = 60, density = True, alpha = 0.4, color = COLORS[tc], edgecolor = 'k', range = (0, 20), label = tc.title())
+                ax.plot(UVALS, weib(UVALS), color = change_luminosity(COLORS[tc], 0.85))
+                fit_label = r'$k={k:.2f},~\lambda={lamb:.2f}$'.format(k = shape, lamb = scale)
+                ax.text(0.99, 0.815-0.135*j, s = fit_label, size = 'large', horizontalalignment = 'right', verticalalignment = 'top', color = change_luminosity(COLORS[tc], 1.15), transform = ax.transAxes)
+                if i == 1:
+                    ax.legend(loc = 'lower right')
+        else:
+            ws_hm = df[f'ws_{h}m']
+            ws_noinf = ws_hm.replace([np.inf,-np.inf], np.nan).dropna()
+            weib, [shape, scale] = stats.fit_wind_weibull(ws_noinf)
+            if details:
+                print(f'Shape parameter k = {shape:.4f}')
+                print(f'Scale parameter lambda = {scale:.4f}')
+            ax.hist(x = ws_noinf, bins = 60, density = True, alpha = 0.4, color = COLORS['default1'], edgecolor = 'k', range = (0, 20))
+            ax.plot(UVALS, weib(UVALS), color = change_luminosity(COLORS['default1'], 0.85))
+            fit_label = r'$k={k:.2f},~\lambda={lamb:.2f}$'.format(k = shape, lamb = scale)
+            ax.text(0.99, 0.815, s = fit_label, size = 'large', horizontalalignment = 'right', verticalalignment = 'top', transform = ax.transAxes)
+        ax.xaxis.grid(True, linestyle='--', alpha=0.6)
+        ax.set_title(f'{h} meters', loc = 'right', x = 0.99, y = 0.825)
+        ax.set_xlim(0, 17)
+        ax.set_ylim(0, 0.265)
+        if i == 1:
+            ax.set_xlabel('Wind Speed (m/s)')
+            ax.set_ylabel('Probability Density')
+    if poster:
+        fig.suptitle('Wind Speed Distributions with Best-Fit Weibull Curves Overlaid')
+    fig.tight_layout()
+    plt.savefig(saveto, bbox_inches = 'tight', edgecolor = fig.get_edgecolor())
+    return
 
 ALL_PLOTS = {
     'bar_stability': ('Stability Frequency Bar Plot', bar_stability, (4,3)),
     'annual_profiles' : ('Annual Wind Profiles with Fits, by Terrain', annual_profiles, (6.5,3)),
     'wse_histograms' : ('Histograms of WSE, by Stability, including Terrain', wse_histograms, (6.5,4.5)),
-    'veer_profiles' : ('Wind direction profiles, by Terrain', veer_profiles, (6.5,3)),
+    'veer_profiles' : ('Wind Direction Profiles, by Terrain', veer_profiles, (6.5,3)),
     'tod_wse' : ('Time of Day Plots of WSE, by Terrain, including Stability & Fits', tod_wse, (6.5,6)),
     'data_gaps' : ('Data Gap Visualization', data_gaps, (6.5,3)),
     'terrain_breakdown' : ('Breakdown of Terrain Characterizations, by Month', terrain_breakdown, (6.5,4.5)),
-    'windrose_comparison' : ('KCC/CID Wind Rose Comparison', windrose_comparison, (6.5,3))
+    'windrose_comparison' : ('KCC/CID Wind Rose Comparison', windrose_comparison, (6.5,3)),
+    'pti_profiles' : ('Annual Pseudo-TI Profiles, by Terrain', pti_profiles, (6.5,3)),
+    'speed_distributions' : ('Distributions of Wind Speeds, by Height', speed_distributions, (6.5,6))
 }
 
 def list_possible_plots():
@@ -412,15 +501,20 @@ def list_possible_plots():
     for tag in ALL_PLOTS.keys():
         print(f'\t{tag}')
 
-JUSTONE = None #'windrose_comparison'
+JUSTONE = 'speed_distributions'
 
 def generate_plots(df: pd.DataFrame, cid: pd.DataFrame, savedir: str, summary: dict, which: list = [JUSTONE] if JUSTONE is not None else ALL_PLOTS.keys(), poster: bool = False, details: bool = False, **kwargs):
-    # for sc in df['stability'].unique():
-    #     print(sc)
-    #     dfs = df[df['stability'] == sc]
-    #     N = len(dfs[dfs['alpha'] < 0])
-    #     print(N)
-    #     print(N/len(dfs))
+    if details:
+        print('details = True (additional details will be printed)')
+        for sc in df['stability'].unique():
+            print(f"In stability class '{sc}':")
+            dfs = df[df['stability'] == sc]
+            N = len(dfs[dfs['alpha'] < 0])
+            print(f'\t{N} have alpha < 0 ({100*N/len(dfs):.3f}%)')
+        for h in HEIGHTS:
+            print(f"At height {h} meters:")
+            print(f'\tMean gust factor is {df[f"gust_{h}m"].mean():.4f}')
+            print(f'\tMedian gust factor is {df[f"gust_{h}m"].median():.4f}')
     plt.rcParams['font.size'] = 13 if poster else 14
     plt.rcParams['font.family'] = 'sans-serif' if poster else 'serif'
     plt.rcParams['mathtext.fontset'] = 'dejavusans' if poster else 'stix'

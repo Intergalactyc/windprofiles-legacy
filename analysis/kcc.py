@@ -3,13 +3,15 @@ import numpy as np
 import windprofiles.preprocess as preprocess
 import windprofiles.compute as compute
 import windprofiles.storms as storms
+import windprofiles.lib.polar as polar
+from windprofiles.analyze import dict_checksum, dataframe_checksum
 from windprofiles.classify import TerrainClassifier, StabilityClassifier, CoordinateRegion
 import finalplots
 import json
 import sys
 import os
+import glob
 from kcc_definitions import *
-from functools import reduce
 
 PARENTDIR = 'C:/Users/22wal/OneDrive/GLWind' # If you are not Elliott and this is not the path for you then pass argument -d followed by the correct path when running!
 
@@ -23,7 +25,8 @@ RULES = {
     'resampling_window_minutes' : 10,
     'stability_classes' : 4,
     'terrain_window_width_degrees' : 60,
-    'terrain_wind_height_meters' : 10
+    'terrain_wind_height_meters' : 10,
+    'turbulence_method_local' : False, # For finding pseudo-TI (pti). if True, divide by local (at height) mean speed; if False, divide by reference (106m) mean speed
 }
 
 def load_data(data_directory: str, outer_merges: bool = False):
@@ -93,7 +96,8 @@ def perform_preprocessing(df,
                           resampling_window,
                           storm_events = None,
                           weather_data = None,
-                          storm_removal = False):
+                          storm_removal = False,
+                          turbulence_local = True):
     print("START DATA PREPROCESSING")
     
     doWeather = not(storm_events is None or weather_data is None)
@@ -137,7 +141,9 @@ def perform_preprocessing(df,
     df = preprocess.resample(df = df,
                             window_size_minutes = resampling_window,
                             how = 'mean',
-                            all_heights = HEIGHTS)
+                            all_heights = HEIGHTS,
+                            pti = True, # do compute pseudo-turbulence-intensity (pseudo-TI or pti) as well as max wind speed (gust estimate)
+                            turbulence_reference = -1 if turbulence_local else 106) # -1 indicates local
 
     # Remove rows where there isn't enough data (not enough columns, or missing either 10m or 106m data)
     df = preprocess.strip_missing_data(df = df,
@@ -163,7 +169,9 @@ def perform_preprocessing(df,
 
 def compute_values(df,
                    terrain_classifier,
-                   stability_classifier):
+                   stability_classifier,
+                   ti_correction_factor
+                   ):
 
     print("BEGIN COMPUTATIONS")
 
@@ -182,6 +190,13 @@ def compute_values(df,
     df = compute.classifications(df = df,
                                  terrain_classifier = terrain_classifier,
                                  stability_classifier = stability_classifier)
+    
+    df = compute.ti_correction(df = df,
+                               heights = HEIGHTS,
+                               factor = ti_correction_factor)
+
+    df = compute.gusts(df = df,
+                       heights = HEIGHTS)
     
     df = compute.power_law_fits(df = df,
                                 heights = HEIGHTS,
@@ -237,17 +252,47 @@ def get_weather_data(start_time, end_time):
     cid = cid[(cid['time'] <= end_time) & (cid['time'] >= start_time)].reset_index(drop = True)
     return cid
 
-def dict_checksum(d: dict, verbose: bool = False) -> int:
-    result = abs(reduce(lambda x,y : x^y, [hash(item) for item in d.items()]))
-    if verbose:
-        print(result)
-    return result
+def load_sonic_sample(data_directory: str) -> pd.DataFrame:
+    # keep in mind that this is 106 meters only
+    csv_files = glob.glob(data_directory + "/*.csv")
+    df_list = (pd.read_csv(file, low_memory = False).drop(columns = ['CO2', 'H2O', 'Ts', 'Uz', 'amb_press', 'amb_tmpr'], errors = 'ignore') for file in csv_files)
+    dfs = pd.concat(df_list, ignore_index = True).rename(columns = {'TIMESTAMP' : 'time'})
+    dfs['time'] = pd.to_datetime(dfs['time'], format = 'ISO8601')
+    dfs = dfs.set_index('time').replace('"NAN"', np.nan).astype('float32').dropna(axis = 0, how = 'any')
+    dfs = dfs[~dfs.index.duplicated(keep = 'first')].sort_index()
+    dfs.index = dfs.index.tz_localize('UTC').tz_convert(LOCAL_TIMEZONE)
+    return dfs
 
-def dataframe_checksum(df: pd.DataFrame, verbose: bool = False) -> int:
-    result = int(pd.util.hash_pandas_object(df).sum())
-    if verbose:
-        print(result)
-    return result
+def process_sonic_sample(dfs: pd.DataFrame, chunking_minutes: int, frequency: float = 20) -> pd.DataFrame:
+    N_expected = frequency * chunking_minutes * 60
+
+    to_resample = dfs.copy(deep = True)
+    to_resample['windspeed'] = np.sqrt(to_resample['Ux']**2 + to_resample['Uy']**2)
+
+    window = f'{chunking_minutes}min'
+    rsmp = to_resample.resample(window)
+    resampled = rsmp.mean()
+    stds = rsmp.std()
+    count = rsmp.size()
+
+    lowcount = count[count < N_expected / 2].index
+    stds.drop(index = lowcount, inplace = True)
+    resampled.drop(index = lowcount, inplace = True)
+
+    resampled['TI_106m_true'] = stds['windspeed'] / resampled['windspeed']
+
+    return resampled
+
+def sonic_correction(df: pd.DataFrame, sonic_results: pd.DataFrame):
+    print('Computing sonic TI correction factor')
+    merged = sonic_results.join(df['pti_106m'])
+    factor = merged['TI_106m_true'] / merged['pti_106m']
+    mean_factor = factor.mean()
+    median_factor = factor.median()
+    std_factor = factor.std()
+    print(f'Factor statistics: mean = {mean_factor:.4f}, median = {median_factor:.4f}, std = {std_factor:.4f}')
+    print(f'(Using median factor {median_factor:.4f})')
+    return median_factor
 
 def save_results(df: pd.DataFrame, storm_events: pd.DataFrame, cid_data: pd.DataFrame, rules: dict, savedir: str):
     print(f'Saving results in directory {savedir}')
@@ -311,9 +356,11 @@ def validate_summary(summary: dict, df: pd.DataFrame, storm_events: pd.DataFrame
     return True
 
 if __name__ == '__main__':
-    RELOAD = False
-    POSTER = False
-    DETAILS = False
+    RELOAD = False # Redo slow data computations
+    POSTER = False # Generate plots in poster mode
+    DETAILS = False # Print verbose details during plotting session
+    SONIC = False # Redo sonic sample data computations
+    # NPROC = 1
     if len(sys.argv) > 1:
         if '-r' in sys.argv:
             RELOAD = True
@@ -326,7 +373,38 @@ if __name__ == '__main__':
             POSTER = True
         if '-v' in sys.argv:
             DETAILS = True
+        if '-s' in sys.argv:
+            SONIC = True
+        # if '-n' in sys.argv:
+        #     n_index = sys.argv.index('-n')
+        #     if n_index == len(sys.argv) - 1:
+        #         raise Exception('Must follow -n flag with an integer number of processors')
+        #     nproc_str = sys.argv[n_index + 1]
+        #     try:
+        #         NPROC = int(nproc_str)
+        #         assert(NPROC > 0)
+        #     except:
+        #         raise Exception(f"Unparsable argument to -n: '{nproc_str}'")
     
+    if SONIC:
+        print('START SONIC PROCESSING')
+        dfs = load_sonic_sample(
+            data_directory = f'{PARENTDIR}/data/KCC_FluxData_106m_Sample'
+        )
+
+        sonic_results = process_sonic_sample(
+            dfs = dfs,
+            chunking_minutes = RULES['resampling_window_minutes'] # use the same sampling window as for slow for ease of combination
+        )
+
+        # WARNING - BE CAREFUL, THERE IS NO CHECKSUM COMPUTATION FOR SONIC. MAKE SURE TO RERUN IF IT IS CHANGED.
+        sonic_results.to_csv(f'{PARENTDIR}/results/sonic/sonic.csv')
+        sonic_results.to_parquet(f'{PARENTDIR}/results/sonic/sonic.parquet')
+        print('END SONIC PROCESSING')
+    else:
+        sonic_results = pd.read_parquet(f'{PARENTDIR}/results/sonic/sonic.parquet')
+        print('SONIC set to False, loaded past sonic results.')
+
     if RELOAD:
         df = load_data(
             data_directory = f'{PARENTDIR}/data/KCC_SlowData',
@@ -354,7 +432,13 @@ if __name__ == '__main__':
             resampling_window = RULES['resampling_window_minutes'], # Duration, in minutes, of resampling window
             storm_events = storm_events,
             weather_data = cid_data,
-            storm_removal = RULES['storm_removal'] # discard stormy data?
+            storm_removal = RULES['storm_removal'], # discard stormy data?
+            turbulence_local = RULES['turbulence_method_local'] # use local normalization or base on 106m reference height?
+        )
+
+        ti_correction_factor = sonic_correction(
+            df = df,
+            sonic_results = sonic_results
         )
 
         # Define 3-class bulk Richardson number stability classification scheme
@@ -392,7 +476,8 @@ if __name__ == '__main__':
         df = compute_values(
             df = df,
             terrain_classifier = terrain_classifier,
-            stability_classifier = stability_classifier
+            stability_classifier = stability_classifier,
+            ti_correction_factor = ti_correction_factor
         )
 
         df.reset_index(inplace = True)

@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 import pandas as pd
 import os
+from functools import reduce
 
 MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
@@ -24,3 +25,15 @@ def get_monthly_breakdown(df: pd.DataFrame, column: str, ignore: list = []) -> t
             breakdown.loc[mon, cls] = count
             proportions.loc[mon, cls] = count / total
     return breakdown, proportions
+
+def dict_checksum(d: dict, verbose: bool = False) -> int:
+    result = abs(reduce(lambda x,y : x^y, [hash(item) for item in d.items()]))
+    if verbose:
+        print(result)
+    return result
+
+def dataframe_checksum(df: pd.DataFrame, verbose: bool = False) -> int:
+    result = int(pd.util.hash_pandas_object(df).sum())
+    if verbose:
+        print(result)
+    return result

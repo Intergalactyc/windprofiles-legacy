@@ -1,6 +1,7 @@
 import math
 import numpy as np
 from scipy.optimize import curve_fit
+import scipy.stats as st
 
 def ls_linear_fit(xvals, yvals):
     """
@@ -87,3 +88,12 @@ def fit_sine(x, y, yerrs, guess_period = 2*np.pi/24, guess_shift = np.pi/2, fix_
     # }
 
     return bestfit, params#fitinfo
+
+def weibull_pdf(x, shape, scale):
+    # for x, shape, scale > 0
+    return (shape/scale) * (x/scale)**(shape-1) * np.exp(-(x/scale)**shape)
+
+def fit_wind_weibull(data):
+    _, shape, _, scale = st.exponweib.fit(data, floc = 0, f0 = 1)
+    bestfit = lambda x : weibull_pdf(x, shape, scale)
+    return bestfit, [shape, scale]
