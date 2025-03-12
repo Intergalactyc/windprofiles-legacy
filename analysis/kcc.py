@@ -97,7 +97,7 @@ def perform_preprocessing(df,
                           storm_events = None,
                           weather_data = None,
                           storm_removal = False,
-                          turbulence_local = True):
+                          turbulence_local = False):
     print("START DATA PREPROCESSING")
     
     doWeather = not(storm_events is None or weather_data is None)

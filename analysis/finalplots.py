@@ -82,7 +82,7 @@ CENTERDATES = { # Solstices/equinoxes in 2018
     'summer' : datetime.date(2018, 6, 21)
 }
 
-GAPS_LINEAR = False # Show data_gaps plot with a linear y scale?
+GAPS_LINEAR = True # Show data_gaps plot with a linear y scale?
 DISTS_BY_TERRAIN = True # Show separate terrain classes in speed_distributions?
 
 def bar_stability(df, cid, summary, size, saveto, poster, details):
@@ -501,7 +501,7 @@ def list_possible_plots():
     for tag in ALL_PLOTS.keys():
         print(f'\t{tag}')
 
-JUSTONE = 'speed_distributions'
+JUSTONE = None
 
 def generate_plots(df: pd.DataFrame, cid: pd.DataFrame, savedir: str, summary: dict, which: list = [JUSTONE] if JUSTONE is not None else ALL_PLOTS.keys(), poster: bool = False, details: bool = False, **kwargs):
     if details:
