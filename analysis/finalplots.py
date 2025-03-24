@@ -83,7 +83,9 @@ CENTERDATES = { # Solstices/equinoxes in 2018
 }
 
 GAPS_LINEAR = True # Show data_gaps plot with a linear y scale?
-DISTS_BY_TERRAIN = True # Show separate terrain classes in speed_distributions?
+DISTS_BY_TERRAIN = True # Show separate terrain classes in speed_distributions and pti_distributions?
+
+CORRELATION_VARIABLES = [f'ws_{h}m' for h in HEIGHTS_GAPS] + [f't_{h}m' for h in HEIGHTS_GAPS] + [f'p_{h}m' for h in HEIGHTS_GAPS] + [f'rh_{h}m' for h in HEIGHTS_GAPS] + [f'pti_{h}m' for h in HEIGHTS_GAPS] + ['vpt_10m', 'vpt_106m', 'vpt_lapse', 'alpha', 'Ri_bulk']
 
 def bar_stability(df, cid, summary, size, saveto, poster, details):
     COLORS = COLORS_POSTER if poster else COLORS_FORMAL
@@ -147,6 +149,9 @@ def annual_profiles(df, cid, summary, size, saveto, poster, details):
             #plot_fit(heights = [6, 10, 20, 32], linestyle = 'dashed') # all heights except for 106 meters (6 - 32) "Ex 3"
             
         ax.set_xlabel('Mean Wind Speed (m/s)')
+        ax.set_title(tc.title(), loc = 'right', x = 0.98, y = 0.02)
+        ax.xaxis.grid(True, linestyle='--', alpha=0.6)
+
         if i == 0: ax.set_ylabel('Height (m)')
         if poster:
             tc_title = (r'Open Terrain (${openL}-{openR}\degree$ at {h}m)'.format(openL = int(135 - summary['terrain_window_width_degrees']/2), openR = int(135 + summary['terrain_window_width_degrees']/2), h = summary['terrain_wind_height_meters'])
@@ -231,13 +236,17 @@ def veer_profiles(df, cid, summary, size, saveto, poster, details):
             means = [polar.unit_average_direction(dfs[f'wd_{h}m']) for h in HEIGHTS]
             ax.plot(means, HEIGHTS, color = change_luminosity(COLORS[sc], 0.85), zorder = 0)
             ax.scatter(means, HEIGHTS, label = sc.title(), zorder = 5, s = 75, marker = MARKERS[sc], facecolors = 'none', edgecolors = COLORS[sc], linewidths = 1.5)
+            
         ax.set_xlabel('Mean Wind Direction (degrees)')
+        ax.set_title(tc.title(), loc = 'right', x = 0.98, y = 0.02)
+        ax.xaxis.grid(True, linestyle='--', alpha=0.6)
+
         if i == 0:
             ax.set_xlim(125, 175)
             ax.set_ylabel('Height (m)')
-            ax.legend(loc = 'lower right')
         elif i == 1:
             ax.set_xlim(295, 345)
+            ax.legend(loc = 'upper left')
         if poster:
             tc_title = (r'Open Terrain (${openL}-{openR}\degree$ at {h}m)'.format(openL = int(135 - summary['terrain_window_width_degrees']/2), openR = int(135 + summary['terrain_window_width_degrees']/2), h = summary['terrain_wind_height_meters'])
                     if tc == 'open'
@@ -420,7 +429,9 @@ def pti_profiles(df, cid, summary, size, saveto, poster, details):
             ax.plot(means, HEIGHTS, color = change_luminosity(COLORS[sc], 0.85), zorder = 0)
             ax.scatter(means, HEIGHTS, label = sc.title(), zorder = 5, s = 75, marker = MARKERS[sc], facecolors = 'none', edgecolors = COLORS[sc], linewidths = 1.5)
         ax.set_xlabel(r'$\sigma_{M}/\overline{M}$')
-        ax.set_xlim(0, 0.25)
+        ax.set_xlim(0, 0.2)
+        ax.set_title(tc.title(), loc = 'right', x = 0.98, y = 0.02)
+        ax.xaxis.grid(True, linestyle='--', alpha=0.6)
         if i == 0:
             ax.set_ylabel('Height (m)')
             ax.legend(loc = 'upper right')
@@ -483,6 +494,93 @@ def speed_distributions(df, cid, summary, size, saveto, poster, details):
     plt.savefig(saveto, bbox_inches = 'tight', edgecolor = fig.get_edgecolor())
     return
 
+def pti_distributions(df, cid, summary, size, saveto, poster, details):
+    COLORS = COLORS_POSTER if poster else COLORS_FORMAL
+    fig, axs = plt.subplots(nrows = len(HEIGHTS), ncols = 1, sharex = True, figsize = size, linewidth = 5*poster, edgecolor = 'k')
+
+    N = len(HEIGHTS)
+    for i, h in enumerate(HEIGHTS,1):
+        ax = axs[N-i]
+
+        ax.set_xlim(0, 0.4)
+        ax.set_ylim(0, 13)
+
+        if DISTS_BY_TERRAIN:
+            for j, tc in enumerate(TERRAINS):
+                pti_hm = df[df['terrain'] == tc][f'pti_{h}m']
+                ax.hist(x = pti_hm, bins = 60, density = True, alpha = 0.4, color = COLORS[tc], edgecolor = 'k', range = (0, 0.4), label = tc.title())
+                if i == 1:
+                    ax.legend(loc = 'lower right')
+            ax.vlines(x = [df.loc[df['terrain'] == tc, f'pti_{h}m'].mean() for tc in TERRAINS], ymin = 0, ymax = ax.get_ylim()[1], colors = [change_luminosity(COLORS[tc], 1.5) for tc in TERRAINS], alpha = 0.7, linestyle = 'solid', linewidth = 4)
+            ax.vlines(x = [df.loc[df['terrain'] == tc, f'pti_{h}m'].median() for tc in TERRAINS], ymin = 0, ymax = ax.get_ylim()[1], colors = [change_luminosity(COLORS[tc], 1.5) for tc in TERRAINS], alpha = 0.8, linestyle = 'dashed', linewidth = 4)
+        else:
+            pti_hm = df[f'pti_{h}m']
+            ax.hist(x = pti_hm, bins = 60, density = True, alpha = 0.4, color = COLORS['default1'], edgecolor = 'k', range = (0, 0.4))
+            ax.vlines(x = [df[f'pti_{h}m'].mean()], ymin = 0, ymax = ax.get_ylim()[1], colors = [change_luminosity(COLORS['default1'], 1.5)], alpha = 0.7, linestyle = 'solid', linewidth = 4)
+            ax.vlines(x = [df[f'pti_{h}m'].median()], ymin = 0, ymax = ax.get_ylim()[1], colors = [change_luminosity(COLORS['default1'], 1.5)], alpha = 0.8, linestyle = 'dashed', linewidth = 4)
+
+        ax.xaxis.grid(True, linestyle='--', alpha=0.6)
+        ax.set_title(f'{h} meters', loc = 'right', x = 0.99, y = 0.825)
+
+        if i == 1:
+            ax.set_xlabel(r'$\sigma_M/\overline{M}$')
+            ax.set_ylabel('Probability Density')
+    if poster:
+        fig.suptitle('Pseudo Turbulence Intensity Distributions by Height')
+    fig.tight_layout()
+    plt.savefig(saveto, bbox_inches = 'tight', edgecolor = fig.get_edgecolor())
+    return
+
+def pti_vs_wse(df, cid, summary, size, saveto, poster, details):
+    COLORS = COLORS_POSTER if poster else COLORS_FORMAL
+    fig, ax = plt.subplots(figsize = size, linewidth = 5*poster, edgecolor = 'k')
+
+    o_n_mask = (df['stability'] == 'neutral') & (df['terrain'] == 'open')
+    o_n_df = df[o_n_mask]
+    etc_df = df[~o_n_mask]
+
+    ax.scatter(etc_df['alpha'], etc_df['pti_106m'], s = 0.5, c = COLORS['default1'], label = 'All Other Data')
+    ax.scatter(o_n_df['alpha'], o_n_df['pti_106m'], s = 2, c = COLORS['default2'], label = 'Open Terrain + Neutral Stability')
+    ax.legend()
+
+    ax.set_xlim(-0.05, 1.0)
+    ax.set_ylim(-0.025, 0.475)
+
+    ax.set_xlabel(r'$\alpha$')
+    ax.set_ylabel(r'$\sigma_M/\overline{M}$ (106 meters)')
+
+    fig.tight_layout()
+    plt.savefig(saveto, bbox_inches = 'tight', edgecolor = fig.get_edgecolor())
+    return
+
+def pti_vs_rib(df, cid, summary, size, saveto, poster, details):
+    COLORS = COLORS_POSTER if poster else COLORS_FORMAL
+    fig, ax = plt.subplots(figsize = size, linewidth = 5*poster, edgecolor = 'k')
+
+    ax.scatter(df['Ri_bulk'], df['pti_106m'], s = 1, c = COLORS['default1'])
+
+    ax.set_xlim(-0.5, 0.5)
+    ax.set_ylim(0, 0.3)
+
+    ax.set_xlabel(r'$Ri_b$')
+    ax.set_ylabel(r'$\sigma_M/\overline{M}$ (106 meters)')
+
+    fig.tight_layout()
+    plt.savefig(saveto, bbox_inches = 'tight', edgecolor = fig.get_edgecolor())
+    return
+
+def correlations(df, cid, summary, size, saveto, poster, details):
+    COLORS = COLORS_POSTER if poster else COLORS_FORMAL
+    fig, ax = plt.subplots(figsize = size, linewidth = 5*poster, edgecolor = 'k')
+
+    
+
+    if details:
+
+    fig.tight_layout()
+    plt.savefig(saveto, bbox_inches = 'tight', edgecolor = fig.get_edgecolor())
+    return
+
 ALL_PLOTS = {
     'bar_stability': ('Stability Frequency Bar Plot', bar_stability, (4,3)),
     'annual_profiles' : ('Annual Wind Profiles with Fits, by Terrain', annual_profiles, (6.5,3)),
@@ -493,7 +591,11 @@ ALL_PLOTS = {
     'terrain_breakdown' : ('Breakdown of Terrain Characterizations, by Month', terrain_breakdown, (6.5,4.5)),
     'windrose_comparison' : ('KCC/CID Wind Rose Comparison', windrose_comparison, (6.5,3)),
     'pti_profiles' : ('Annual Pseudo-TI Profiles, by Terrain', pti_profiles, (6.5,3)),
-    'speed_distributions' : ('Distributions of Wind Speeds, by Height', speed_distributions, (6.5,6))
+    'speed_distributions' : ('Distributions of Wind Speeds, by Height', speed_distributions, (6.5,6)),
+    'pti_distributions' : ('Distributions of Pseudo-TI, by Height', pti_distributions, (6.5,6)),
+    'pti_vs_wse' : ('106 meter Pseudo-TI vs WSE', pti_vs_wse, (6.5,3)),
+    'pti_vs_rib' : ('106 meter Pseudo-TI vs Bulk Ri', pti_vs_rib, (6.5, 3)),
+    'correlations' : ('Correlation Coefficients', correlations, (7,7))
 }
 
 def list_possible_plots():
