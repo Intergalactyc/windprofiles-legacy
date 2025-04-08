@@ -5,7 +5,7 @@ import numpy as np
 import os
 import windprofiles.lib.stats as stats
 import windprofiles.lib.polar as polar
-from windprofiles.analyze import get_monthly_breakdown
+from windprofiles.analyze import get_monthly_breakdown, get_correlations
 from windprofiles.lib.other import time_to_hours
 from windprofiles.plotting import change_luminosity
 import datetime
@@ -573,12 +573,82 @@ def correlations(df, cid, summary, size, saveto, poster, details):
     COLORS = COLORS_POSTER if poster else COLORS_FORMAL
     fig, ax = plt.subplots(figsize = size, linewidth = 5*poster, edgecolor = 'k')
 
-    
+    WHICH = [col for col in CORRELATION_VARIABLES if col in df.columns]
+    corrs = get_correlations(df, which = WHICH)
+
+    im = ax.imshow(corrs, cmap = 'seismic', vmin = -1., vmax = 1.)
+    ax.set_xticks(ticks = range(len(WHICH)), labels = WHICH, rotation = 90)
+    ax.set_yticks(ticks = range(len(WHICH)), labels = WHICH)
+
+    cbar = ax.figure.colorbar(im, ax = ax)
+    cbar.ax.set_ylabel("correlation (Pearson r)", rotation = -90, va = "bottom")
 
     if details:
+        print('\nCorrelations\n')
+        pd.set_option('display.precision',3)
+        print(corrs)
+        pd.set_option('display.precision',6)
 
     fig.tight_layout()
     plt.savefig(saveto, bbox_inches = 'tight', edgecolor = fig.get_edgecolor())
+    return
+
+def determinations(df, cid, summary, size, saveto, poster, details):
+    COLORS = COLORS_POSTER if poster else COLORS_FORMAL
+    fig, ax = plt.subplots(figsize = size, linewidth = 5*poster, edgecolor = 'k')
+
+    WHICH = [col for col in CORRELATION_VARIABLES if col in df.columns]
+    corrs = get_correlations(df, which = WHICH)**2
+    
+    im = ax.imshow(corrs, cmap = 'plasma', vmin = 0., vmax = 1.)
+    ax.set_xticks(ticks = range(len(WHICH)), labels = WHICH, rotation = 90)
+    ax.set_yticks(ticks = range(len(WHICH)), labels = WHICH)
+
+    cbar = ax.figure.colorbar(im, ax = ax)
+    cbar.ax.set_ylabel("determination (r^2)", rotation = -90, va = "bottom")
+
+    if details:
+        print('\nCoefficients of Determination (r^2)\n')
+        pd.set_option('display.precision',3)
+        print(corrs)
+        pd.set_option('display.precision',6)
+
+    fig.tight_layout()
+    plt.savefig(saveto, bbox_inches = 'tight', edgecolor = fig.get_edgecolor())
+    return
+
+def alpha_corrs(df):
+
+    def get_and_scatter(col, transy, transx = 'linear', alpha_bounds = (0,1)):
+        dfx = df[(df['alpha'] < alpha_bounds[1]) & (df['alpha'] > alpha_bounds[0])]
+        if col == 'Ri_bulk':
+            dfx = dfx[np.abs(dfx['Ri_bulk']) < 2]
+        value = stats.rcorrelation(dfx, col, 'alpha', ('linear', transy))
+        print(f'alpha ({transy}) vs {col} ({transx}): {value:.3f} (r^2 = {(value**2):.3f})')
+        try:
+            plt.scatter(stats.TRANSFORMS[transx](dfx[col]), dfx['alpha'], s = 0.1, alpha = 0.5)
+            plt.yscale(transy)
+            plt.ylabel(f'alpha ({transy})')
+            plt.xlabel(f'{col} ({transx})')
+            plt.show()
+        except:
+            plt.close()
+            plt.scatter(stats.TRANSFORMS[transx](dfx[col]), stats.TRANSFORMS[transy](dfx['alpha']), s = 0.1, alpha = 0.5)
+            plt.ylabel(f'alpha ({transy})')
+            plt.xlabel(f'{col} ({transx})')
+            plt.show()
+        return
+
+    print('\n\nCORRELATION COEFFICIENTS (PEARSON R) OF ALPHA WITH OTHERS:')
+    COLS = ['vpt_lapse', 'Ri_bulk'] #+ [f'pti_{h}m' for h in HEIGHTS_GAPS]
+    METHS = ['linear', 'log', 'exp', 'inv']
+    for col in COLS:
+        for meth in METHS:
+            get_and_scatter(col, meth)
+        #get_and_scatter(col, 'log', 'log')
+
+    print('\n\n')
+
     return
 
 ALL_PLOTS = {
@@ -595,7 +665,8 @@ ALL_PLOTS = {
     'pti_distributions' : ('Distributions of Pseudo-TI, by Height', pti_distributions, (6.5,6)),
     'pti_vs_wse' : ('106 meter Pseudo-TI vs WSE', pti_vs_wse, (6.5,3)),
     'pti_vs_rib' : ('106 meter Pseudo-TI vs Bulk Ri', pti_vs_rib, (6.5, 3)),
-    'correlations' : ('Correlation Coefficients', correlations, (7,7))
+    'correlations' : ('Correlation Coefficients', correlations, (7,7)),
+    'determinations' : ('Determination Coefficients', determinations, (7,7)),
 }
 
 def list_possible_plots():
@@ -617,6 +688,7 @@ def generate_plots(df: pd.DataFrame, cid: pd.DataFrame, savedir: str, summary: d
             print(f"At height {h} meters:")
             print(f'\tMean gust factor is {df[f"gust_{h}m"].mean():.4f}')
             print(f'\tMedian gust factor is {df[f"gust_{h}m"].median():.4f}')
+        #alpha_corrs(df) # UNCOMMENT FOR MORE DETAILS ON ALPHA'S CORRELATIONS WITH TRANSFORMED QTYS
     plt.rcParams['font.size'] = 13 if poster else 14
     plt.rcParams['font.family'] = 'sans-serif' if poster else 'serif'
     plt.rcParams['mathtext.fontset'] = 'dejavusans' if poster else 'stix'

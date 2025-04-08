@@ -3,6 +3,14 @@ import numpy as np
 from scipy.optimize import curve_fit
 import scipy.stats as st
 
+TRANSFORMS = {
+    'linear' : (lambda x : x),
+    'log' : (lambda x : np.log(x)),
+    'exp' : (lambda x : np.exp(x)),
+    'inv' : (lambda x : 1/x),
+    'square' : (lambda x : x**2)
+}
+
 def ls_linear_fit(xvals, yvals):
     """
     Least squares fit to a relationship y = a + b*x
@@ -97,3 +105,10 @@ def fit_wind_weibull(data):
     _, shape, _, scale = st.exponweib.fit(data, floc = 0, f0 = 1)
     bestfit = lambda x : weibull_pdf(x, shape, scale)
     return bestfit, [shape, scale]
+
+def rcorrelation(df, col1, col2, transform = ('linear', 'linear')):
+    tran_x = TRANSFORMS[transform[0]]
+    tran_y = TRANSFORMS[transform[1]]
+    dfr = df[~(np.isnan(tran_x(df[col1]))|np.isnan(tran_y(df[col2])))]
+    cor = st.pearsonr(tran_x(dfr[col1]), tran_y(dfr[col2]))[0]
+    return float(cor)
