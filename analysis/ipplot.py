@@ -414,3 +414,30 @@ def generate_plots(df: pd.DataFrame, cid: pd.DataFrame):
     #print_storm_amounts(df)
     raw_data_with_storms(df)
     #compare_temperature(df, cid)
+
+
+def plot_data(df: pd.DataFrame):
+    for h in HEIGHTS:
+        plt.plot(df['time'], df[f'ws_{h}m'], linewidth = 1, label = h)
+    plt.legend()
+    plt.show()
+
+def ws_correlations(df: pd.DataFrame):
+    corrs = pd.DataFrame(data = 0., index = HEIGHTS, columns = HEIGHTS)
+    for i, h1 in enumerate(HEIGHTS):
+        corrs.loc[h1, h1] = 1.
+        for h2 in HEIGHTS[i+1:]:
+            r12 = stats.rcorrelation(df, f'ws_{h1}m', f'ws_{h2}m')
+            corrs.loc[h1, h2] = r12
+            corrs.loc[h2, h1] = r12
+            #print(f'Between {h1} and {h2}: {r12}')
+    print(corrs)
+
+if __name__ == '__main__':
+    df = pd.read_parquet(f'C:/Users/22wal/OneDrive/GLWind/results/recent/output.parquet')
+
+    plot_data(df)
+
+    print('Original full dataframe')
+    ws_correlations(df)
+    print('\nRestricted to post Dec 3, 2017 @ 5:35 CST')
