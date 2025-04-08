@@ -419,7 +419,7 @@ def pti_profiles(df, cid, summary, size, saveto, poster, details):
             #means = [polar.unit_average_direction(dfs[f'wd_{h}m']) for h in HEIGHTS]
             ax.plot(means, HEIGHTS, color = change_luminosity(COLORS[sc], 0.85), zorder = 0)
             ax.scatter(means, HEIGHTS, label = sc.title(), zorder = 5, s = 75, marker = MARKERS[sc], facecolors = 'none', edgecolors = COLORS[sc], linewidths = 1.5)
-        ax.set_xlabel(r'$\sigma_{M}/\overline{M}$')
+        ax.set_xlabel(r'$TI$')
         ax.set_xlim(0, 0.25)
         if i == 0:
             ax.set_ylabel('Height (m)')
@@ -429,9 +429,9 @@ def pti_profiles(df, cid, summary, size, saveto, poster, details):
                     if tc == 'open'
                     else r'Complex Terrain (${complexL}-{complexR}\degree$ at {h}m)'.format(complexL = int(315 - summary['terrain_window_width_degrees']/2), complexR = int(315 + summary['terrain_window_width_degrees']/2), h = summary['terrain_wind_height_meters'])
                 )
-            ax.set_title(tc_title)
+            ax.set_title(tc_title) 
     if poster:
-        fig.suptitle(r'Annual Profiles of $\sigma_{M}/\overline{M}$, by Terrain and Stability')
+        fig.suptitle(r'Annual Profiles of Turbulence Intensity, by Terrain and Stability')
     fig.tight_layout()
     plt.savefig(saveto, bbox_inches = 'tight', edgecolor = fig.get_edgecolor())
 

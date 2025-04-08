@@ -5,3 +5,4 @@ build/
 *.egg-info/
 *.whl
 *.sync-conflict*
+testscr.py
