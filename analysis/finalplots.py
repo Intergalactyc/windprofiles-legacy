@@ -428,7 +428,7 @@ def pti_profiles(df, cid, summary, size, saveto, poster, details):
             #means = [polar.unit_average_direction(dfs[f'wd_{h}m']) for h in HEIGHTS]
             ax.plot(means, HEIGHTS, color = change_luminosity(COLORS[sc], 0.85), zorder = 0)
             ax.scatter(means, HEIGHTS, label = sc.title(), zorder = 5, s = 75, marker = MARKERS[sc], facecolors = 'none', edgecolors = COLORS[sc], linewidths = 1.5)
-        ax.set_xlabel(r'$\sigma_{M}/\overline{M}$')
+        ax.set_xlabel(r'$TI$')
         ax.set_xlim(0, 0.2)
         ax.set_title(tc.title(), loc = 'right', x = 0.98, y = 0.02)
         ax.xaxis.grid(True, linestyle='--', alpha=0.6)
@@ -523,7 +523,7 @@ def pti_distributions(df, cid, summary, size, saveto, poster, details):
         ax.set_title(f'{h} meters', loc = 'right', x = 0.99, y = 0.825)
 
         if i == 1:
-            ax.set_xlabel(r'$\sigma_M/\overline{M}$')
+            ax.set_xlabel(r'$TI$')
             ax.set_ylabel('Probability Density')
     if poster:
         fig.suptitle('Pseudo Turbulence Intensity Distributions by Height')
@@ -547,7 +547,7 @@ def pti_vs_wse(df, cid, summary, size, saveto, poster, details):
     ax.set_ylim(-0.025, 0.475)
 
     ax.set_xlabel(r'$\alpha$')
-    ax.set_ylabel(r'$\sigma_M/\overline{M}$ (106 meters)')
+    ax.set_ylabel(r'$TI$ (106 meters)')
 
     fig.tight_layout()
     plt.savefig(saveto, bbox_inches = 'tight', edgecolor = fig.get_edgecolor())
