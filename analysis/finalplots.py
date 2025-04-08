@@ -375,7 +375,7 @@ def windrose_comparison(df, cid, summary, size, saveto, poster, details):
     
     # Custom legend labels
     speed_bins = [0.,1.5,3.,4.5,6.,7.5,9.,1000] # 1000 in place of np.inf (unrealistically high speed value; np.inf gives a RuntimeWarning even though it works)
-    cmap = cm.rainbow_r  # Color map used for bins (note: suffix _r for reversed version)
+    cmap = cm.rainbow  # Color map used for bins (note: append suffix _r to use reversed version)
     # Good cmaps: jet, jet_r, gist_rainbow, coolwarm, coolwarm_r, plasma_r, viridis_r, rainbow_r, rainbow
     colors = [cmap(i / len(speed_bins)) for i in range(len(speed_bins))]
 
@@ -425,11 +425,13 @@ def pti_profiles(df, cid, summary, size, saveto, poster, details):
         for sc in stabilities:
             dfs = dft[dft['stability'] == sc]
             means = dfs[[f'pti_{h}m' for h in HEIGHTS]].mean(axis = 0).values
-            #means = [polar.unit_average_direction(dfs[f'wd_{h}m']) for h in HEIGHTS]
             ax.plot(means, HEIGHTS, color = change_luminosity(COLORS[sc], 0.85), zorder = 0)
             ax.scatter(means, HEIGHTS, label = sc.title(), zorder = 5, s = 75, marker = MARKERS[sc], facecolors = 'none', edgecolors = COLORS[sc], linewidths = 1.5)
         ax.set_xlabel(r'$TI$')
-        ax.set_xlim(0, 0.2)
+        if summary['turbulence_method_local']:
+            ax.set_xlim(0, 0.25)
+        else:
+            ax.set_xlim(0, 0.2)
         ax.set_title(tc.title(), loc = 'right', x = 0.98, y = 0.02)
         ax.xaxis.grid(True, linestyle='--', alpha=0.6)
         if i == 0:

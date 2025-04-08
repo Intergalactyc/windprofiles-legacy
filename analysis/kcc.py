@@ -26,7 +26,7 @@ RULES = {
     'stability_classes' : 4,
     'terrain_window_width_degrees' : 60,
     'terrain_wind_height_meters' : 10,
-    'turbulence_method_local' : True, # For finding pseudo-TI (pti). if True, divide by local (at height) mean speed; if False, divide by reference (106m) mean speed
+    'turbulence_method_local' : False, # For finding pseudo-TI (pti). if True, divide by local (at height) mean speed; if False, divide by reference (106m) mean speed
 }
 
 def load_data(data_directory: str, outer_merges: bool = False):
