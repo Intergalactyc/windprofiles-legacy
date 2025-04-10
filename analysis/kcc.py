@@ -13,7 +13,7 @@ import os
 import glob
 from kcc_definitions import *
 
-PARENTDIR = 'C:/Users/22wal/OneDrive/GLWind' # If you are not Elliott and this is not the path for you then pass argument -d followed by the correct path when running!
+PARENTDIR = 'C:/Users/22wal/Documents/GLWind' # If you are not Elliott and this is not the path for you then pass argument -d followed by the correct path when running!
 
 RULES = {
     'shadowing_width_degrees' : 30,

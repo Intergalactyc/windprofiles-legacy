@@ -434,7 +434,7 @@ def ws_correlations(df: pd.DataFrame):
     print(corrs)
 
 if __name__ == '__main__':
-    df = pd.read_parquet(f'C:/Users/22wal/OneDrive/GLWind/results/recent/output.parquet')
+    df = pd.read_parquet(f'C:/Users/22wal/Documents/GLWind/results/recent/output.parquet')
 
     plot_data(df)
 

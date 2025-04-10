@@ -29,8 +29,8 @@ SOURCE_UNITS = {
 HEIGHTS = [6, 10, 20, 32, 80, 106]
 
 STORM_FILES = [
-    "C:/Users/22wal/OneDrive/GLWind/data/StormEvents/StormEvents_details-ftp_v1.0_d2017_c20250122.csv",
-    "C:/Users/22wal/OneDrive/GLWind/data/StormEvents/StormEvents_details-ftp_v1.0_d2018_c20240716.csv"
+    "C:/Users/22wal/Documents/GLWind/data/StormEvents/StormEvents_details-ftp_v1.0_d2017_c20250122.csv",
+    "C:/Users/22wal/Documents/GLWind/data/StormEvents/StormEvents_details-ftp_v1.0_d2018_c20240716.csv"
 ]
 
 CID_DATA_PATH = "C:/Users/22wal/OneDrive/GLWind/data/CID/CID_Sep012017_Aug312018.csv"
