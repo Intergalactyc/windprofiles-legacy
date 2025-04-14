@@ -25,51 +25,51 @@ RULES = {
     'resampling_window_minutes' : 10,
     'stability_classes' : 4,
     'terrain_window_width_degrees' : 60,
-    'terrain_wind_height_meters' : 10,
-    'turbulence_method_local' : False, # For finding pseudo-TI (pti). if True, divide by local (at height) mean speed; if False, divide by reference (106m) mean speed
+    'terrain_wind_boom' : 2,
+    'turbulence_method_local' : True, # For finding pseudo-TI (pti). if True, divide by local (at height) mean speed; if False, divide by reference (106m) mean speed
 }
 
 def load_data(data_directory: str, outer_merges: bool = False):
     print('START DATA LOADING')
     # Read in the data from the booms and set column names to common format
     boom1 = pd.read_csv(f'{data_directory}/Boom1OneMin.csv').rename(columns={'TimeStamp' : 'time',
-                                                        'MeanVelocity (m/s)' : 'ws_6m',
-                                                        'MeanDirection' : 'wd_6m',
-                                                        'MeanTemperature (C )' : 't_6m',
-                                                        'MeanPressure (mmHg)' : 'p_6m'})
+                                                        'MeanVelocity (m/s)' : 'ws_1',
+                                                        'MeanDirection' : 'wd_1',
+                                                        'MeanTemperature (C )' : 't_1',
+                                                        'MeanPressure (mmHg)' : 'p_1'})
 
     boom2 = pd.read_csv(f'{data_directory}/Boom2OneMin.csv').rename(columns={'TIMESTAMP' : 'time',
-                                                        'MeanVelocity (m/s)' : 'ws_10m',
-                                                        'MeanDirection' : 'wd_10m',
-                                                        'MeanTemperature (C )' : 't_10m',
-                                                        'MeanRH (%)' : 'rh_10m'})
+                                                        'MeanVelocity (m/s)' : 'ws_2',
+                                                        'MeanDirection' : 'wd_2',
+                                                        'MeanTemperature (C )' : 't_2',
+                                                        'MeanRH (%)' : 'rh_2'})
 
     boom3 = pd.read_csv(f'{data_directory}/Boom3OneMin.csv').rename(columns={'TIMESTAMP' : 'time',
-                                                        'MeanVelocity (m/s)' : 'ws_20m',
-                                                        'MeanDirection' : 'wd_20m'})
+                                                        'MeanVelocity (m/s)' : 'ws_3',
+                                                        'MeanDirection' : 'wd_3'})
 
     boom4 = pd.read_csv(f'{data_directory}/Boom4OneMin.csv').rename(columns={'TimeStamp' : 'time',
-                                                        'MeanVelocity' : 'ws_32m',
-                                                        'MeanDirection' : 'wd_32m',
-                                                        'MeanTemperature' : 't_32m',
-                                                        'MeanRH' : 'rh_32m'})
+                                                        'MeanVelocity' : 'ws_4',
+                                                        'MeanDirection' : 'wd_4',
+                                                        'MeanTemperature' : 't_4',
+                                                        'MeanRH' : 'rh_4'})
 
     boom5 = pd.read_csv(f'{data_directory}/Boom5OneMin.csv').rename(columns={'TimeStamp' : 'time',
-                                                        'MeanVelocity' : 'ws_80m',
-                                                        'MeanDirection' : 'wd_80m',
-                                                        'MeanTemperature' : 't_80m',
-                                                        'MeanRH' : 'rh_80m'})
+                                                        'MeanVelocity' : 'ws_5',
+                                                        'MeanDirection' : 'wd_5',
+                                                        'MeanTemperature' : 't_5',
+                                                        'MeanRH' : 'rh_5'})
 
     boom6 = pd.read_csv(f'{data_directory}/Boom6OneMin.csv').rename(columns={'TIMESTAMP' : 'time',
-                                                        'MeanVelocity (m/s)' : 'ws_106m1',
-                                                        'Mean Direction' : 'wd_106m1',
-                                                        'MeanTemperature (C )' : 't_106m',
-                                                        'MeanRH (%)' : 'rh_106m'})
+                                                        'MeanVelocity (m/s)' : 'ws_6a',
+                                                        'Mean Direction' : 'wd_6a',
+                                                        'MeanTemperature (C )' : 't_6',
+                                                        'MeanRH (%)' : 'rh_6'})
 
     boom7 = pd.read_csv(f'{data_directory}/Boom7OneMin.csv').rename(columns={'TimeStamp' : 'time',
-                                                        'MeanVelocity (m/s)' : 'ws_106m2',
-                                                        'MeanDirection' : 'wd_106m2',
-                                                        'MeanPressure (mmHg)' : 'p_106m'})
+                                                        'MeanVelocity (m/s)' : 'ws_6b',
+                                                        'MeanDirection' : 'wd_6b',
+                                                        'MeanPressure (mmHg)' : 'p_6'})
 
     # Merge the data together into one pd.DataFrame
     boom_list = [boom1,boom2,boom3,boom4,boom5,boom6,boom7]
@@ -109,13 +109,13 @@ def perform_preprocessing(df,
     # Boom 6 (106m1, west side) is shadowed near 90 degrees (wind from east)
     # Boom 7 (106m2, east side) is shadowed near 270 degrees (wind from west)
     # Important that we do this after the conversion step, to make sure wind angles are correct
-    df['ws_106m'], df['wd_106m'] = preprocess.shadowing_merge(
+    df['ws_6'], df['wd_6'] = preprocess.shadowing_merge(
         df = df,
-        speeds = ['ws_106m1', 'ws_106m2'],
-        directions = ['wd_106m1', 'wd_106m2'],
+        speeds = ['ws_6a', 'ws_6b'],
+        directions = ['wd_6a', 'wd_6b'],
         angles = [90, 270],
         width = shadowing_width, # Winds from within 30/2=15 degrees of tower are discarded
-        drop_old = True # Discard the 106m1 and 106m2 columns afterwards
+        drop_old = True # Discard the 6a and 6b columns afterwards
     )
 
     # Final common formatting changes:
@@ -141,13 +141,13 @@ def perform_preprocessing(df,
     df = preprocess.resample(df = df,
                             window_size_minutes = resampling_window,
                             how = 'mean',
-                            all_heights = HEIGHTS,
+                            all_booms = BOOM_LIST,
                             pti = True, # do compute pseudo-turbulence-intensity (pseudo-TI or pti) as well as max wind speed (gust estimate)
-                            turbulence_reference = -1 if turbulence_local else 106) # -1 indicates local
+                            turbulence_reference = -1 if turbulence_local else 6) # -1 indicates local
 
     # Remove rows where there isn't enough data (not enough columns, or missing either 10m or 106m data)
     df = preprocess.strip_missing_data(df = df,
-                                    necessary = [6, 10, 106],
+                                    necessary = [1, 2, 6],
                                     minimum = 4)
     
     if doWeather:
@@ -176,14 +176,17 @@ def compute_values(df,
     print("BEGIN COMPUTATIONS")
 
     df = compute.virtual_potential_temperatures(df = df,
+                                                booms = [2, 6],
                                                 heights = [10, 106],
-                                                substitutions = {'p_10m' : 'p_6m'})
+                                                substitutions = {'p_2' : 'p_1'})
         
     df = compute.environmental_lapse_rate(df = df,
                                           variable = 'vpt',
+                                          booms = [2, 6],
                                           heights = [10, 106])
     
     df = compute.bulk_richardson_number(df = df,
+                                        booms = [2, 6],
                                         heights = [10, 106],
                                         gravity = LOCAL_GRAVITY)
         
@@ -192,21 +195,24 @@ def compute_values(df,
                                  stability_classifier = stability_classifier)
     
     df = compute.ti_correction(df = df,
-                               heights = HEIGHTS,
+                               booms = BOOM_LIST,
                                factor = ti_correction_factor)
 
     df = compute.gusts(df = df,
-                       heights = HEIGHTS)
+                       booms = BOOM_LIST)
     
     df = compute.power_law_fits(df = df,
-                                heights = HEIGHTS,
+                                booms = BOOM_LIST,
+                                heights = HEIGHT_LIST,
                                 columns = [None,'alpha'])
     
     df = compute.power_law_fits(df = df,
+                                booms = [1, 2, 3, 4, 5],
                                 heights = [6, 10, 20, 32, 80],
                                 columns = [None,'alpha_no106'])
     
     df = compute.power_law_fits(df = df,
+                                booms = [1, 2, 3, 5, 6],
                                 heights = [6, 10, 20, 80, 106],
                                 columns = [None,'alpha_no32'])
     
@@ -239,11 +245,11 @@ def get_weather_data(start_time, end_time):
     cid.drop(columns = ['station','dwpc'], inplace = True)
     cid.rename(columns = {
         'valid' : 'time',
-        'tmpc' : 't_0m',
-        'relh' : 'rh_0m',
-        'drct' : 'wd_0m',
-        'sped' : 'ws_0m',
-        'mslp' : 'p_0m',
+        'tmpc' : 't_0',
+        'relh' : 'rh_0',
+        'drct' : 'wd_0',
+        'sped' : 'ws_0',
+        'mslp' : 'p_0',
         'p01m' : 'precip'
     }, inplace=True)
     cid['time'] = pd.to_datetime(cid['time']).dt.tz_localize('UTC').dt.tz_convert(LOCAL_TIMEZONE)
@@ -279,14 +285,14 @@ def process_sonic_sample(dfs: pd.DataFrame, chunking_minutes: int, frequency: fl
     stds.drop(index = lowcount, inplace = True)
     resampled.drop(index = lowcount, inplace = True)
 
-    resampled['TI_106m_true'] = stds['windspeed'] / resampled['windspeed']
+    resampled['TI_6_true'] = stds['windspeed'] / resampled['windspeed']
 
     return resampled
 
 def sonic_correction(df: pd.DataFrame, sonic_results: pd.DataFrame):
     print('Computing sonic TI correction factor')
-    merged = sonic_results.join(df['pti_106m'])
-    factor = merged['TI_106m_true'] / merged['pti_106m']
+    merged = sonic_results.join(df['pti_6'])
+    factor = merged['TI_6_true'] / merged['pti_6']
     mean_factor = factor.mean()
     median_factor = factor.median()
     std_factor = factor.std()
@@ -424,7 +430,7 @@ if __name__ == '__main__':
             shadowing_width = RULES['shadowing_width_degrees'], # width, in degrees, of shadowing bins
             removal_periods = {
                 ('2018-03-05 13:20:00','2018-03-10 00:00:00') : 'ALL', # large maintenance gap
-                ('2018-04-18 17:40:00','2018-04-19 14:20:00') : [106], # small maintenance-shaped gap
+                ('2018-04-18 17:40:00','2018-04-19 14:20:00') : [6], # small maintenance-shaped gap
                 ('2018-09-10 12:00:00','2018-09-20 12:00:00') : 'ALL' # blip at end
             } if RULES['default_removals'] else None,
             outlier_window = RULES['outlier_window_minutes'], # Duration, in minutes, of rolling outlier removal window
@@ -436,10 +442,11 @@ if __name__ == '__main__':
             turbulence_local = RULES['turbulence_method_local'] # use local normalization or base on 106m reference height?
         )
 
-        ti_correction_factor = sonic_correction(
-            df = df,
-            sonic_results = sonic_results
-        )
+        if SONIC:
+            ti_correction_factor = sonic_correction(
+                df = df,
+                sonic_results = sonic_results
+            )
 
         # Define 3-class bulk Richardson number stability classification scheme
         if RULES['stability_classes'] == 3:
@@ -470,14 +477,14 @@ if __name__ == '__main__':
             openCenter = 135,
             radius = RULES['terrain_window_width_degrees']/2,
             inclusive = True,
-            height = RULES['terrain_wind_height_meters']
+            boom = RULES['terrain_wind_boom']
         )
 
         df = compute_values(
             df = df,
             terrain_classifier = terrain_classifier,
             stability_classifier = stability_classifier,
-            ti_correction_factor = ti_correction_factor
+            ti_correction_factor = ti_correction_factor if SONIC else 1
         )
 
         df.reset_index(inplace = True)

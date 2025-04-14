@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 from matplotlib import cm
+from matplotlib.ticker import ScalarFormatter
 import pandas as pd
 import numpy as np
 import os
@@ -14,7 +15,7 @@ from astral.sun import sun
 import windrose
 from kcc_definitions import LATITUDE, LONGITUDE
 
-ROSE_HEIGHT = 10
+ROSE_BOOM = 2
 
 COLORS_POSTER = {
     'open' : '#1f77b4',
@@ -55,8 +56,12 @@ MARKERS = {
     'default2' : 's'
 }
 
-HEIGHTS = [6, 10, 20, 32, 106] # Heights that we are concerned with for plotting, in meters. 80m is left out here.
-HEIGHTS_GAPS = [6, 10, 20, 32, 80, 106] # Every height (HEIGHTS but with 80 as well), for the data gaps visualization
+BOOMS = [1, 2, 3, 4, 6]
+HEIGHTS = [6., 10., 20., 32., 106.] # Heights that we are concerned with for plotting, in meters. 80m is left out here.
+
+BOOMS_GAPS = [1, 2, 3, 4, 5, 6]
+HEIGHTS_GAPS = [6., 10., 20., 32., 80., 106.] # Every height (HEIGHTS but with 80 as well), for the data gaps visualization
+
 ZVALS = np.linspace(0.,157.5,400) # Linspace for plotting heights
 UVALS = np.linspace(0, 17, 360) # Linspace for plotting wind speed distributions
 TERRAINS = ['open', 'complex']
@@ -82,10 +87,13 @@ CENTERDATES = { # Solstices/equinoxes in 2018
     'summer' : datetime.date(2018, 6, 21)
 }
 
-GAPS_LINEAR = True # Show data_gaps plot with a linear y scale?
+GAPS_LINEAR = False # Show data_gaps plot with a linear y scale?
+GAPS_LOGARITHMIC = True # Show data_gaps plot with a logarithmic y scale?
+if GAPS_LINEAR and GAPS_LOGARITHMIC:
+    raise('Cannot have both log and linear scale')
 DISTS_BY_TERRAIN = True # Show separate terrain classes in speed_distributions and pti_distributions?
 
-CORRELATION_VARIABLES = [f'ws_{h}m' for h in HEIGHTS_GAPS] + [f't_{h}m' for h in HEIGHTS_GAPS] + [f'p_{h}m' for h in HEIGHTS_GAPS] + [f'rh_{h}m' for h in HEIGHTS_GAPS] + [f'pti_{h}m' for h in HEIGHTS_GAPS] + ['vpt_10m', 'vpt_106m', 'vpt_lapse', 'alpha', 'Ri_bulk']
+CORRELATION_VARIABLES = [f'ws_{b}' for b in BOOMS_GAPS] + [f't_{b}' for b in BOOMS_GAPS] + [f'p_{b}' for b in BOOMS_GAPS] + [f'rh_{b}' for b in BOOMS_GAPS] + [f'pti_{b}' for b in BOOMS_GAPS] + ['vpt_2', 'vpt_6', 'vpt_lapse', 'alpha', 'Ri_bulk']
 
 def bar_stability(df, cid, summary, size, saveto, poster, details):
     COLORS = COLORS_POSTER if poster else COLORS_FORMAL
@@ -134,16 +142,16 @@ def annual_profiles(df, cid, summary, size, saveto, poster, details):
             dfs = dft[dft['stability'] == sc]
 
             zorder = 0
-            def plot_fit(heights, linestyle, scatter = False): # linestyle can be 'solid', 'dashed', 'dotted', 'dashdot', or a parameterization tuple
+            def plot_fit(booms, heights, linestyle, scatter = False): # linestyle can be 'solid', 'dashed', 'dotted', 'dashdot', or a parameterization tuple
                 nonlocal zorder
-                means = dfs[[f'ws_{h}m' for h in heights]].mean(axis = 0).values
+                means = dfs[[f'ws_{b}' for b in booms]].mean(axis = 0).values
                 mult, wsc = stats.power_fit(heights, means)
                 ax.plot(mult * ZVALS**wsc, ZVALS, color = change_luminosity(COLORS[sc], 0.85), zorder = zorder, linestyle = linestyle)
                 zorder += 2
                 if scatter: # enable this for the full line
-                    ax.scatter(means, HEIGHTS, label = r'{sc}: $u(z)={a:.2f}z^{{{b:.3f}}}$'.format(sc=short,a=mult,b=wsc), color = COLORS[sc], zorder = 6, s = 75, marker = MARKERS[sc])
+                    ax.scatter(means, heights, label = r'{sc}: $u(z)={a:.2f}z^{{{b:.3f}}}$'.format(sc=short,a=mult,b=wsc), color = COLORS[sc], zorder = 6, s = 75, marker = MARKERS[sc])
 
-            plot_fit(heights = HEIGHTS, linestyle = 'solid', scatter = True) # full (5-height) fit line
+            plot_fit(booms = BOOMS, heights = HEIGHTS, linestyle = 'solid', scatter = True) # full (5-height) fit line
             #plot_fit(heights = [6, 10], linestyle = 'dashed') # 2 lowest heights only "Ex 1"
             #plot_fit(heights = [10, 106], linestyle = 'dashed') # 2 key heights (10 & 106 meters) only "Ex 2"
             #plot_fit(heights = [6, 10, 20, 32], linestyle = 'dashed') # all heights except for 106 meters (6 - 32) "Ex 3"
@@ -154,9 +162,9 @@ def annual_profiles(df, cid, summary, size, saveto, poster, details):
 
         if i == 0: ax.set_ylabel('Height (m)')
         if poster:
-            tc_title = (r'Open Terrain (${openL}-{openR}\degree$ at {h}m)'.format(openL = int(135 - summary['terrain_window_width_degrees']/2), openR = int(135 + summary['terrain_window_width_degrees']/2), h = summary['terrain_wind_height_meters'])
+            tc_title = (r'Open Terrain (${openL}-{openR}\degree$ at {b})'.format(openL = int(135 - summary['terrain_window_width_degrees']/2), openR = int(135 + summary['terrain_window_width_degrees']/2), h = summary['terrain_wind_height_meters'])
                     if tc == 'open'
-                    else r'Complex Terrain (${complexL}-{complexR}\degree$ at {h}m)'.format(complexL = int(315 - summary['terrain_window_width_degrees']/2), complexR = int(315 + summary['terrain_window_width_degrees']/2), h = summary['terrain_wind_height_meters'])
+                    else r'Complex Terrain (${complexL}-{complexR}\degree$ at {b})'.format(complexL = int(315 - summary['terrain_window_width_degrees']/2), complexR = int(315 + summary['terrain_window_width_degrees']/2), h = summary['terrain_wind_height_meters'])
                 )
             ax.set_title(tc_title)
         ax.legend(loc = 'upper left')
@@ -233,7 +241,7 @@ def veer_profiles(df, cid, summary, size, saveto, poster, details):
         dft = df[df['terrain'] == tc]
         for sc in stabilities:
             dfs = dft[dft['stability'] == sc]
-            means = [polar.unit_average_direction(dfs[f'wd_{h}m']) for h in HEIGHTS]
+            means = [polar.unit_average_direction(dfs[f'wd_{b}']) for b in BOOMS]
             ax.plot(means, HEIGHTS, color = change_luminosity(COLORS[sc], 0.85), zorder = 0)
             ax.scatter(means, HEIGHTS, label = sc.title(), zorder = 5, s = 75, marker = MARKERS[sc], facecolors = 'none', edgecolors = COLORS[sc], linewidths = 1.5)
             
@@ -248,9 +256,9 @@ def veer_profiles(df, cid, summary, size, saveto, poster, details):
             ax.set_xlim(295, 345)
             ax.legend(loc = 'upper left')
         if poster:
-            tc_title = (r'Open Terrain (${openL}-{openR}\degree$ at {h}m)'.format(openL = int(135 - summary['terrain_window_width_degrees']/2), openR = int(135 + summary['terrain_window_width_degrees']/2), h = summary['terrain_wind_height_meters'])
+            tc_title = (r'Open Terrain (${openL}-{openR}\degree$ at {b})'.format(openL = int(135 - summary['terrain_window_width_degrees']/2), openR = int(135 + summary['terrain_window_width_degrees']/2), h = summary['terrain_wind_height_meters'])
                     if tc == 'open'
-                    else r'Complex Terrain (${complexL}-{complexR}\degree$ at {h}m)'.format(complexL = int(315 - summary['terrain_window_width_degrees']/2), complexR = int(315 + summary['terrain_window_width_degrees']/2), h = summary['terrain_wind_height_meters'])
+                    else r'Complex Terrain (${complexL}-{complexR}\degree$ at {b})'.format(complexL = int(315 - summary['terrain_window_width_degrees']/2), complexR = int(315 + summary['terrain_window_width_degrees']/2), h = summary['terrain_wind_height_meters'])
                 )
             ax.set_title(tc_title)
     if poster:
@@ -310,6 +318,8 @@ def data_gaps(df, cid, summary, size, saveto, poster, details):
     COLORS = COLORS_POSTER if poster else COLORS_FORMAL
     fig, ax = plt.subplots(figsize=size, linewidth=5*poster, edgecolor='k')
 
+    GAP_HEIGHT = 4 if GAPS_LOGARITHMIC else 0
+
     period = summary['resampling_window_minutes']
     start = df['time'].min()
     end = df['time'].max()
@@ -317,21 +327,26 @@ def data_gaps(df, cid, summary, size, saveto, poster, details):
 
     # Identify missing timestamps
     gaps = all_times[~all_times.isin(df['time'])]
-    ax.scatter(gaps, [0 for _ in gaps], s=2.5, c=COLORS['unavailable'])
+    ax.scatter(gaps, [GAP_HEIGHT for _ in gaps], s=2.5, c=COLORS['unavailable'])
 
     # Plot available data at each height
-    for i, h in enumerate(HEIGHTS_GAPS, 1):
-        available = df[~pd.isna(df[f'ws_{h}m'])]['time']
-        ax.scatter(available, [(h if GAPS_LINEAR else i) for _ in available], s=2.5, c=COLORS['available'])
+    for i, (b, h) in enumerate(zip(BOOMS_GAPS, HEIGHTS_GAPS), 1):
+        available = df[~pd.isna(df[f'ws_{b}'])]['time']
+        ax.scatter(available, [(h if GAPS_LINEAR or GAPS_LOGARITHMIC else i) for _ in available], s=2.5, c=COLORS['available'])
 
     # Set y-axis labels and grid
-    if GAPS_LINEAR:
-        ax.set_yticks([0] + HEIGHTS_GAPS)
+    if GAPS_LOGARITHMIC:
+        ax.set_yscale('log')
+        ax.set_ylim(3, 140)
+    if GAPS_LINEAR or GAPS_LOGARITHMIC:
+        ax.set_yticks([GAP_HEIGHT] + HEIGHTS_GAPS)
     else:
         ax.set_yticks(range(len(HEIGHTS_GAPS) + 1))
-    ax.set_yticklabels(['No Data'] + [f"{h}m" for h in HEIGHTS_GAPS])
+    ax.yaxis.set_major_formatter(ScalarFormatter())
+    ax.minorticks_off()
+    ax.set_yticklabels(['No Data'] + [str(int(h)) for h in HEIGHTS_GAPS])
     ax.yaxis.grid(True, linestyle='--', alpha=0.6)
-    ax.set_ylabel('Boom Height')
+    ax.set_ylabel('Boom Height (m)')
 
     # Set x-axis grid at the start of each month
     month_starts = pd.date_range(start=start, end=end, freq='MS')  # 'MS' = Month Start
@@ -380,15 +395,15 @@ def windrose_comparison(df, cid, summary, size, saveto, poster, details):
     colors = [cmap(i / len(speed_bins)) for i in range(len(speed_bins))]
 
     # First, KCC
-    speeds_kcc = df[f'ws_{ROSE_HEIGHT}m']
-    directions_kcc = df[f'wd_{ROSE_HEIGHT}m']
+    speeds_kcc = df[f'ws_{ROSE_BOOM}']
+    directions_kcc = df[f'wd_{ROSE_BOOM}']
     axs[0].bar(directions_kcc, speeds_kcc, normed=True, opening=1.0,
                bins=speed_bins, edgecolor='white', colors=colors, nsector=36)
     axs[0].set_title('KCC', y=1.075)
 
     # Now, CID
-    speeds_cid = cid['ws_0m']
-    directions_cid = cid['wd_0m']
+    speeds_cid = cid['ws_0']
+    directions_cid = cid['wd_0']
     axs[1].bar(directions_cid, speeds_cid, normed=True, opening=1.0,
                bins=speed_bins, edgecolor='white', colors=colors, nsector=36)
     axs[1].set_title('CID', y=1.075)
@@ -424,7 +439,7 @@ def pti_profiles(df, cid, summary, size, saveto, poster, details):
         dft = df[df['terrain'] == tc]
         for sc in stabilities:
             dfs = dft[dft['stability'] == sc]
-            means = dfs[[f'pti_{h}m' for h in HEIGHTS]].mean(axis = 0).values
+            means = dfs[[f'pti_{b}' for b in BOOMS]].mean(axis = 0).values
             ax.plot(means, HEIGHTS, color = change_luminosity(COLORS[sc], 0.85), zorder = 0)
             ax.scatter(means, HEIGHTS, label = sc.title(), zorder = 5, s = 75, marker = MARKERS[sc], facecolors = 'none', edgecolors = COLORS[sc], linewidths = 1.5)
         ax.set_xlabel(r'$TI$')
@@ -438,9 +453,9 @@ def pti_profiles(df, cid, summary, size, saveto, poster, details):
             ax.set_ylabel('Height (m)')
             ax.legend(loc = 'upper right')
         if poster:
-            tc_title = (r'Open Terrain (${openL}-{openR}\degree$ at {h}m)'.format(openL = int(135 - summary['terrain_window_width_degrees']/2), openR = int(135 + summary['terrain_window_width_degrees']/2), h = summary['terrain_wind_height_meters'])
+            tc_title = (r'Open Terrain (${openL}-{openR}\degree$ at {b})'.format(openL = int(135 - summary['terrain_window_width_degrees']/2), openR = int(135 + summary['terrain_window_width_degrees']/2), h = summary['terrain_wind_height_meters'])
                     if tc == 'open'
-                    else r'Complex Terrain (${complexL}-{complexR}\degree$ at {h}m)'.format(complexL = int(315 - summary['terrain_window_width_degrees']/2), complexR = int(315 + summary['terrain_window_width_degrees']/2), h = summary['terrain_wind_height_meters'])
+                    else r'Complex Terrain (${complexL}-{complexR}\degree$ at {b})'.format(complexL = int(315 - summary['terrain_window_width_degrees']/2), complexR = int(315 + summary['terrain_window_width_degrees']/2), h = summary['terrain_wind_height_meters'])
                 )
             ax.set_title(tc_title) 
     if poster:
@@ -453,13 +468,13 @@ def speed_distributions(df, cid, summary, size, saveto, poster, details):
     fig, axs = plt.subplots(nrows = len(HEIGHTS), ncols = 1, sharex = True, figsize = size, linewidth = 5*poster, edgecolor = 'k')
 
     N = len(HEIGHTS)
-    for i, h in enumerate(HEIGHTS,1):
+    for i, (b, h) in enumerate(zip(BOOMS, HEIGHTS),1):
         ax = axs[N-i]
         if details:
             print(f'At {h} meters')
         if DISTS_BY_TERRAIN:
             for j, tc in enumerate(TERRAINS):
-                ws_hm = df[df['terrain'] == tc][f'ws_{h}m']
+                ws_hm = df[df['terrain'] == tc][f'ws_{b}']
                 ws_noinf = ws_hm.replace([np.inf,-np.inf], np.nan).dropna()
                 weib, [shape, scale] = stats.fit_wind_weibull(ws_noinf)
                 if details:
@@ -473,7 +488,7 @@ def speed_distributions(df, cid, summary, size, saveto, poster, details):
                 if i == 1:
                     ax.legend(loc = 'lower right')
         else:
-            ws_hm = df[f'ws_{h}m']
+            ws_hm = df[f'ws_{b}']
             ws_noinf = ws_hm.replace([np.inf,-np.inf], np.nan).dropna()
             weib, [shape, scale] = stats.fit_wind_weibull(ws_noinf)
             if details:
@@ -501,7 +516,7 @@ def pti_distributions(df, cid, summary, size, saveto, poster, details):
     fig, axs = plt.subplots(nrows = len(HEIGHTS), ncols = 1, sharex = True, figsize = size, linewidth = 5*poster, edgecolor = 'k')
 
     N = len(HEIGHTS)
-    for i, h in enumerate(HEIGHTS,1):
+    for i, (b, h) in enumerate(zip(BOOMS, HEIGHTS),1):
         ax = axs[N-i]
 
         ax.set_xlim(0, 0.4)
@@ -509,17 +524,17 @@ def pti_distributions(df, cid, summary, size, saveto, poster, details):
 
         if DISTS_BY_TERRAIN:
             for j, tc in enumerate(TERRAINS):
-                pti_hm = df[df['terrain'] == tc][f'pti_{h}m']
+                pti_hm = df[df['terrain'] == tc][f'pti_{b}']
                 ax.hist(x = pti_hm, bins = 60, density = True, alpha = 0.4, color = COLORS[tc], edgecolor = 'k', range = (0, 0.4), label = tc.title())
                 if i == 1:
                     ax.legend(loc = 'lower right')
-            ax.vlines(x = [df.loc[df['terrain'] == tc, f'pti_{h}m'].mean() for tc in TERRAINS], ymin = 0, ymax = ax.get_ylim()[1], colors = [change_luminosity(COLORS[tc], 1.5) for tc in TERRAINS], alpha = 0.7, linestyle = 'solid', linewidth = 4)
-            ax.vlines(x = [df.loc[df['terrain'] == tc, f'pti_{h}m'].median() for tc in TERRAINS], ymin = 0, ymax = ax.get_ylim()[1], colors = [change_luminosity(COLORS[tc], 1.5) for tc in TERRAINS], alpha = 0.8, linestyle = 'dashed', linewidth = 4)
+            ax.vlines(x = [df.loc[df['terrain'] == tc, f'pti_{b}'].mean() for tc in TERRAINS], ymin = 0, ymax = ax.get_ylim()[1], colors = [change_luminosity(COLORS[tc], 1.5) for tc in TERRAINS], alpha = 0.7, linestyle = 'solid', linewidth = 4)
+            ax.vlines(x = [df.loc[df['terrain'] == tc, f'pti_{b}'].median() for tc in TERRAINS], ymin = 0, ymax = ax.get_ylim()[1], colors = [change_luminosity(COLORS[tc], 1.5) for tc in TERRAINS], alpha = 0.8, linestyle = 'dashed', linewidth = 4)
         else:
-            pti_hm = df[f'pti_{h}m']
+            pti_hm = df[f'pti_{b}']
             ax.hist(x = pti_hm, bins = 60, density = True, alpha = 0.4, color = COLORS['default1'], edgecolor = 'k', range = (0, 0.4))
-            ax.vlines(x = [df[f'pti_{h}m'].mean()], ymin = 0, ymax = ax.get_ylim()[1], colors = [change_luminosity(COLORS['default1'], 1.5)], alpha = 0.7, linestyle = 'solid', linewidth = 4)
-            ax.vlines(x = [df[f'pti_{h}m'].median()], ymin = 0, ymax = ax.get_ylim()[1], colors = [change_luminosity(COLORS['default1'], 1.5)], alpha = 0.8, linestyle = 'dashed', linewidth = 4)
+            ax.vlines(x = [df[f'pti_{b}'].mean()], ymin = 0, ymax = ax.get_ylim()[1], colors = [change_luminosity(COLORS['default1'], 1.5)], alpha = 0.7, linestyle = 'solid', linewidth = 4)
+            ax.vlines(x = [df[f'pti_{b}'].median()], ymin = 0, ymax = ax.get_ylim()[1], colors = [change_luminosity(COLORS['default1'], 1.5)], alpha = 0.8, linestyle = 'dashed', linewidth = 4)
 
         ax.xaxis.grid(True, linestyle='--', alpha=0.6)
         ax.set_title(f'{h} meters', loc = 'right', x = 0.99, y = 0.825)
@@ -541,8 +556,8 @@ def pti_vs_wse(df, cid, summary, size, saveto, poster, details):
     o_n_df = df[o_n_mask]
     etc_df = df[~o_n_mask]
 
-    ax.scatter(etc_df['alpha'], etc_df['pti_106m'], s = 0.5, c = COLORS['default1'], label = 'All Other Data')
-    ax.scatter(o_n_df['alpha'], o_n_df['pti_106m'], s = 2, c = COLORS['default2'], label = 'Open Terrain + Neutral Stability')
+    ax.scatter(etc_df['alpha'], etc_df['pti_6'], s = 0.5, c = COLORS['default1'], label = 'All Other Data')
+    ax.scatter(o_n_df['alpha'], o_n_df['pti_6'], s = 2, c = COLORS['default2'], label = 'Open Terrain + Neutral Stability')
     ax.legend()
 
     ax.set_xlim(-0.05, 1.0)
@@ -559,7 +574,7 @@ def pti_vs_rib(df, cid, summary, size, saveto, poster, details):
     COLORS = COLORS_POSTER if poster else COLORS_FORMAL
     fig, ax = plt.subplots(figsize = size, linewidth = 5*poster, edgecolor = 'k')
 
-    ax.scatter(df['Ri_bulk'], df['pti_106m'], s = 1, c = COLORS['default1'])
+    ax.scatter(df['Ri_bulk'], df['pti_6'], s = 1, c = COLORS['default1'])
 
     ax.set_xlim(-0.5, 0.5)
     ax.set_ylim(0, 0.3)
@@ -642,7 +657,7 @@ def alpha_corrs(df):
         return
 
     print('\n\nCORRELATION COEFFICIENTS (PEARSON R) OF ALPHA WITH OTHERS:')
-    COLS = ['vpt_lapse', 'Ri_bulk'] #+ [f'pti_{h}m' for h in HEIGHTS_GAPS]
+    COLS = ['vpt_lapse', 'Ri_bulk'] #+ [f'pti_{b}' for b in BOOMS_GAPS]
     METHS = ['linear', 'log', 'exp', 'inv']
     for col in COLS:
         for meth in METHS:
@@ -686,10 +701,10 @@ def generate_plots(df: pd.DataFrame, cid: pd.DataFrame, savedir: str, summary: d
             dfs = df[df['stability'] == sc]
             N = len(dfs[dfs['alpha'] < 0])
             print(f'\t{N} have alpha < 0 ({100*N/len(dfs):.3f}%)')
-        for h in HEIGHTS:
+        for b in BOOMS:
             print(f"At height {h} meters:")
-            print(f'\tMean gust factor is {df[f"gust_{h}m"].mean():.4f}')
-            print(f'\tMedian gust factor is {df[f"gust_{h}m"].median():.4f}')
+            print(f'\tMean gust factor is {df[f"gust_{b}"].mean():.4f}')
+            print(f'\tMedian gust factor is {df[f"gust_{b}"].median():.4f}')
         #alpha_corrs(df) # UNCOMMENT FOR MORE DETAILS ON ALPHA'S CORRELATIONS WITH TRANSFORMED QTYS
     plt.rcParams['font.size'] = 13 if poster else 14
     plt.rcParams['font.family'] = 'sans-serif' if poster else 'serif'

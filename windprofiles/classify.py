@@ -319,7 +319,7 @@ class SingleClassifier(_TemplateClassifier):
 class TerrainClassifier(PolarClassifier):
     """
     Simple terrain classifer that classifies terrain as either 'open'
-        or 'complex' based on wind direction at a specific height
+        or 'complex' based on wind direction at a specific boom
     """
     def __init__(self, *,
             complexCenter: int|float,
@@ -327,19 +327,19 @@ class TerrainClassifier(PolarClassifier):
             radius: int|float = None,
             width: int|float = None,
             directionCol: str = None,
-            height: int = None,
+            boom: int = None,
             inclusive: bool = True):
         
-        if directionCol is None and height is None:
+        if directionCol is None and boom is None:
             warn('classify.TerrainClassifier: Direction column unspecified, add manually by calling object method set_parameter')
             param = None
-        elif directionCol is not None and height is not None and directionCol != f'wd_{height}m':
-            warn('classify.TerrainClassifier: Got conflicting height and directionCol specifications, defaulting parameter to None. Add manually by calling object method set_parameter')
+        elif directionCol is not None and boom is not None and directionCol != f'wd_{boom}':
+            warn('classify.TerrainClassifier: Got conflicting boom and directionCol specifications, defaulting parameter to None. Add manually by calling object method set_parameter')
             param = None
         elif directionCol is not None:
             param = directionCol
-        elif type(height) is int:
-            param = f'wd_{height}m'
+        elif type(boom) is int:
+            param = f'wd_{boom}'
         else:
             warn('classify.TerrainClassifier: failed to parse direction column specification, defaulting parameter to None. Add manually by calling object method set_parameter')
             param = None
@@ -359,54 +359,54 @@ class TerrainClassifier(PolarClassifier):
                         inclusive = inclusive)
         
         if param is not None:
-            self._height = self._colToHeight(param)
-            self._heightCol = param
+            self._boom = self._colToBoom(param)
+            self._directionCol = param
         else:
-            self._height = None
-            self._heightCol = None
+            self._boom = None
+            self._directionCol = None
 
-    def _colToHeight(self, colName):
+    def _colToBoom(self, colName):
 
         if '_' not in colName:
-            warn('classify.TerrainClassifier._colToHeight: atypical column name format, interpreting height as None. Specify a height by calling object method specify_height')
+            warn('classify.TerrainClassifier._colToBoom: atypical column name format, interpreting boom as None. Specify a boom by calling object method specify_boom')
             return None
 
-        cut = colName.split('_')[1][:-1]
+        cut = colName.split('_')[1]
 
         if not cut.isnumeric():
-            warn('classify.TerrainClassifier._colToHeight: noninteger height in column name, interpreting height as None. Specify a height by calling object method specify_height')
+            warn('classify.TerrainClassifier._colToBoom: noninteger boom in column name, interpreting boom as None. Specify a boom by calling object method specify_boom')
             return None
 
         return int(cut)
 
-    def specify_height(self, new_height: int):
+    def specify_boom(self, new_boom: int):
         """
-        Associate a classification height without overwriting
+        Associate a classification boom without overwriting
             the direction column parameter
         """
-        if self._height is not None:
-            warn(f'classify.TerrainClassifier.specify_height: overwriting previous height of {self._height} with new value of {new_height}')
-        self._height = new_height
+        if self._boom is not None:
+            warn(f'classify.TerrainClassifier.specify_boom: overwriting previous boom of {self._boom} with new value of {new_boom}')
+        self._boom = new_boom
 
     def set_parameter(self, parameter = None):
         """
-        Set/update the wind direction column name (& with it the height)
+        Set/update the wind direction column name (& with it the boom)
         """
-        self._height = self._colToHeight(parameter)
-        self._heightCol = parameter
+        self._boom = self._colToBoom(parameter)
+        self._directionCol = parameter
         return super().set_parameter(parameter)
 
-    def get_height(self) -> int:
+    def get_boom(self) -> int:
         """
-        Get the height that classification is based on
+        Get the boom that classification is based on
         """
-        return self._height
+        return self._boom
 
-    def get_height_column(self) -> str:
+    def get_boom_column(self) -> str:
         """
         Get the classification column name
         """
-        return self._heightCol
+        return self._directionCol
 
 class StabilityClassifier(SingleClassifier):
     def __init__(self, parameter: str = None, classes: list[tuple[str, str]] = None):

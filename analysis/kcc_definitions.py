@@ -25,15 +25,17 @@ SOURCE_UNITS = {
 }
 
 # All heights (in m) that data exists at
-# Data columns will (and must) follow '{type}_{height}m' format
-HEIGHTS = [6, 10, 20, 32, 80, 106]
+# Data columns will (and must) follow '{type}_{boom}' format
+HEIGHT_LIST = [6., 10., 20., 32., 80., 106.]
+BOOM_LIST = [1, 2, 3, 4, 5, 6]
+HEIGHTS = {b : h for b, h in zip(BOOM_LIST, HEIGHT_LIST)}
 
 STORM_FILES = [
     "C:/Users/22wal/Documents/GLWind/data/StormEvents/StormEvents_details-ftp_v1.0_d2017_c20250122.csv",
     "C:/Users/22wal/Documents/GLWind/data/StormEvents/StormEvents_details-ftp_v1.0_d2018_c20240716.csv"
 ]
 
-CID_DATA_PATH = "C:/Users/22wal/OneDrive/GLWind/data/CID/CID_Sep012017_Aug312018.csv"
+CID_DATA_PATH = "C:/Users/22wal/Documents/GLWind/data/CID/CID_Sep012017_Aug312018.csv"
 
 CID_UNITS = {
         'p' : f'mBar_{ELEVATION_METERS}asl',

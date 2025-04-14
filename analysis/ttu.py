@@ -8,6 +8,9 @@ WE_RULES = {
     
 }
 
+NPROC = 12
+LIMIT = None
+
 def get_datetime_from_filename(filename: str):
     DATE_STR = filename.split('_')[4]
     YEAR = int(DATE_STR[1:5])
@@ -25,34 +28,40 @@ def load_and_format_file(filename):
     df = preprocess.rename_headers(df, HEADER_MAP, True, True)
     remap = {}
     heights = set()
+    booms = set()
     for col in df.columns:
         col_type, boom_number = col.split('_')
-        remap[col] = f'{col_type}_{int(HEIGHTS[int(boom_number)])}'
+        booms.add(int(boom_number))
         heights.add(HEIGHTS[int(boom_number)])
     df.rename(columns = remap, inplace = True)
     heights_list = list(heights)
+    booms_list = list(booms)
     heights_list.sort()
-    return df, heights_list
+    booms_list.sort()
+    return df, booms_list, heights_list
 
 def process_file(args):
     filepath, rules = args
-    TIMESTAMP = get_datetime_from_filename(filepath)
-    df, heights_available = load_and_format_file(filepath)
-    print(heights_available)
+    TIMESTAMP = get_datetime_from_filename(filepath).tz_convert(LOCAL_TIMEZONE)
+    df, booms_available, heights_available = load_and_format_file(filepath)
+
+    df = preprocess.convert_dataframe_units(df, from_units = SOURCE_UNITS, gravity = LOCAL_GRAVITY, silent = True)
+
     result = {'time' : TIMESTAMP}
 
-    print(df)
+    result |= sonic.get_stats(df, np.mean, '_mean', ['u', 'v', 't', 'ts', 'rh', 'p'])
+    result |= sonic.get_stats(df, np.std, '_std', ['u', 'v'])
 
     return result
 
 def process_day(day, rules):
-    results = sonic.analyze_directory(path = f'{SOURCE_DIRECTORY}/0{day}',
+    return sonic.analyze_directory(path = f'{SOURCE_DIRECTORY}/0{day}',
                                       analysis = process_file,
                                       rules = rules,
-                                      nproc = 1,
+                                      nproc = NPROC,
                                       index = 'time',
-                                      limit = 1)
-    return results
+                                      limit = LIMIT,
+                                      progress = True)
 
 if __name__ == '__main__':
     for i in range(1, 8):

@@ -189,8 +189,8 @@ def correct_directions(df):
     result = df.copy()
     for col in result.columns:
         if col[:3] == 'wd_':
-            h = col[3]
-            ws_col = f'ws_{int(h)}m'
+            b = col[3]
+            ws_col = f'ws_{b}'
             if ws_col in result.columns:
                 result.loc[result[ws_col] == 0, col] = pd.NA
             else:
@@ -213,9 +213,9 @@ def clean_formatting(df, type = 'float32', silent = False):
     for column in result.columns:
         if '_' in column and 'time' not in column:
             result[column] = result[column].astype(type)
-            columntype, heightStr, *_ = column.split('_')
+            columntype, boomStr, *_ = column.split('_')
             if columntype == 'ws':
-                dircol = f'wd_{heightStr}'
+                dircol = f'wd_{boomStr}'
                 result.loc[result[column] == 0, dircol] = np.nan
 
     result = result.reset_index(names = 'time').sort_values(by = 'time').set_index('time')
@@ -285,7 +285,7 @@ def remove_data(df: pd.DataFrame, periods: dict, silent: bool = False) -> pd.Dat
     """
     Removes data within certain specified datetime intervals.
     Removal can be complete (specify 'ALL') or partial (specify 
-        list of integer heights).
+        list of integer booms).
     See kcc.py's `removal_periods` for an example of proper
         format for `periods`.
     If silent == False then #s of total and partial removals
@@ -296,19 +296,19 @@ def remove_data(df: pd.DataFrame, periods: dict, silent: bool = False) -> pd.Dat
     total_removals = 0
     partial_removals = 0
     
-    for interval, which_heights in periods.items():
+    for interval, which_booms in periods.items():
         
         removal_start, removal_end = interval
         indices = result.loc[result['time'].between(removal_start, removal_end, inclusive='both')].index
         
-        if type(which_heights) is str and which_heights.lower() == 'all': # if all data is to be removed, just drop the full row entry
+        if type(which_booms) is str and which_booms.lower() == 'all': # if all data is to be removed, just drop the full row entry
             result.drop(index = indices, inplace = True)
             total_removals += len(indices)
-        elif type(which_heights) is list: # otherwise, just set data from the selected heights to NaN
+        elif type(which_booms) is list: # otherwise, just set data from the selected booms to NaN
             datatypes = ['p','ws','wd','t','rh']
-            for h in which_heights:
+            for b in which_booms:
                 for d in datatypes:
-                    selection = f'{d}_{int(h)}m'
+                    selection = f'{d}_{b}'
                     if selection in result.columns:
                         result.loc[indices, selection] = np.nan
             partial_removals += len(indices)
@@ -356,7 +356,7 @@ def rolling_outlier_removal(df: pd.DataFrame,
     return result
 
 def resample(df: pd.DataFrame,
-             all_heights: list[int],
+             all_booms: list[int],
              window_size_minutes: int,
              how: str = 'mean',
              silent: bool = False,
@@ -367,9 +367,9 @@ def resample(df: pd.DataFrame,
     easy_cols = ['t', 'p', 'rh']
     window = f'{window_size_minutes}min'
 
-    for h in all_heights:
-        dirRad = np.deg2rad(to_resample[f'wd_{int(h)}m'])
-        to_resample[f'x_{int(h)}m'], to_resample[f'y_{int(h)}m'] = polar.wind_components(to_resample[f'ws_{int(h)}m'], to_resample[f'wd_{int(h)}m'])
+    for b in all_booms:
+        dirRad = np.deg2rad(to_resample[f'wd_{b}'])
+        to_resample[f'x_{b}'], to_resample[f'y_{b}'] = polar.wind_components(to_resample[f'ws_{b}'], to_resample[f'wd_{b}'])
     
     rsmp = to_resample.resample(window)
     if how == 'mean':
@@ -386,22 +386,22 @@ def resample(df: pd.DataFrame,
     resampled.dropna(axis = 0, how = 'all', inplace = True)
     dropped = before_drop - resampled.shape[0]
 
-    for h in all_heights:
+    for b in all_booms:
         if pti:
-            # Compute pseudo-turbulence intensities 'pti_{int(h)}m' per height as (mean of wind speeds) / (mean wind speed [direct magnitude average])
+            # Compute pseudo-turbulence intensities 'pti_{b}' per height as (mean of wind speeds) / (mean wind speed [direct magnitude average])
                 # mean wind speed used is that at height `turbulence_reference` (or at local height if turbulence_reference == -1)
-            ref = h if (type(turbulence_reference) is not int or turbulence_reference < 0) else turbulence_reference
-            if ref not in all_heights:
-                raise Exception(f'preprocess.resample: in pseudo-TI calculation, unrecognized reference height {ref}m')
-            resampled[f'pti_{int(h)}m'] = stds[f'ws_{int(h)}m'] / resampled[f'ws_{ref}m'] # divide by raw average wind speed, before vector averaging
+            ref = b if (type(turbulence_reference) is not int or turbulence_reference < 0) else turbulence_reference
+            if ref not in all_booms:
+                raise Exception(f'preprocess.resample: in pseudo-TI calculation, unrecognized reference boom {ref}')
+            resampled[f'pti_{b}'] = stds[f'ws_{b}'] / resampled[f'ws_{ref}'] # divide by raw average wind speed, before vector averaging
         
         # Get maximum wind speed in each interval
-        resampled[f'maxws_{int(h)}m'] = maxs[f'ws_{int(h)}m']
+        resampled[f'maxws_{b}'] = maxs[f'ws_{b}']
 
         # Find vector averages
-        resampled[f'ws_{int(h)}m'] = np.sqrt(resampled[f'x_{int(h)}m']**2+resampled[f'y_{int(h)}m']**2)
-        resampled[f'wd_{int(h)}m'] = (np.rad2deg(np.arctan2(resampled[f'x_{int(h)}m'], resampled[f'y_{int(h)}m'])) + 360) % 360
-        resampled.drop(columns=[f'x_{int(h)}m',f'y_{int(h)}m'], inplace=True)
+        resampled[f'ws_{b}'] = np.sqrt(resampled[f'x_{b}']**2+resampled[f'y_{b}']**2)
+        resampled[f'wd_{b}'] = (np.rad2deg(np.arctan2(resampled[f'x_{b}'], resampled[f'y_{b}'])) + 360) % 360
+        resampled.drop(columns=[f'x_{b}',f'y_{b}'], inplace=True)
 
     if not silent:
         print(f'preprocess.resample() - resampling into {window_size_minutes} minute intervals ({how}s) complete')
@@ -492,7 +492,7 @@ def rename_headers(df, mapper, drop_nones: bool = True, drop_others: bool = True
 def strip_missing_data(df: pd.DataFrame, necessary: list[int], minimum: int = 4, silent: bool = False):
     """
     Remove rows where there are fewer than `minimum` wind speed columns or where
-        wind speeds are missing at any of the `necessary` heights
+        wind speeds are missing at any of the `necessary` booms
     """
     result = df.copy()
 
@@ -501,7 +501,7 @@ def strip_missing_data(df: pd.DataFrame, necessary: list[int], minimum: int = 4,
 
     cols = result.columns
 
-    necessarys = [f'ws_{int(h)}m' for h in necessary]
+    necessarys = [f'ws_{b}' for b in necessary]
     ws_cols = []
     for col in cols:
         if 'ws_' in col:
