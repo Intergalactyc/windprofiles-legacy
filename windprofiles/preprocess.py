@@ -41,6 +41,8 @@ def _convert_pressure(series, from_unit, gravity = atmos.STANDARD_GRAVITY):
             return series
         case 'mmHg':
             return series * 0.13332239
+        case 'inHg':
+            return series * 3.38639
         case 'mBar':
             return series / 10.
         case _:
@@ -153,9 +155,16 @@ def convert_dataframe_units(df, from_units, gravity = atmos.STANDARD_GRAVITY, si
     conversions_by_type = {
         'p' : _convert_pressure,
         't' : _convert_temperature,
+        'ts' : _convert_temperature,
         'rh' : _convert_humidity,
-        'ws' : _convert_speed,
         'wd' : _convert_direction,
+        'ws' : _convert_speed,
+        'u' : _convert_speed,
+        'v' : _convert_speed,
+        'w' : _convert_speed,
+        'ux' : _convert_speed,
+        'uy' : _convert_speed,
+        'uz' : _convert_speed,
     }
 
     for column in result.columns:
@@ -181,7 +190,7 @@ def correct_directions(df):
     for col in result.columns:
         if col[:3] == 'wd_':
             h = col[3]
-            ws_col = f'ws_{h}m'
+            ws_col = f'ws_{int(h)}m'
             if ws_col in result.columns:
                 result.loc[result[ws_col] == 0, col] = pd.NA
             else:
@@ -299,7 +308,7 @@ def remove_data(df: pd.DataFrame, periods: dict, silent: bool = False) -> pd.Dat
             datatypes = ['p','ws','wd','t','rh']
             for h in which_heights:
                 for d in datatypes:
-                    selection = f'{d}_{h}m'
+                    selection = f'{d}_{int(h)}m'
                     if selection in result.columns:
                         result.loc[indices, selection] = np.nan
             partial_removals += len(indices)
@@ -359,8 +368,8 @@ def resample(df: pd.DataFrame,
     window = f'{window_size_minutes}min'
 
     for h in all_heights:
-        dirRad = np.deg2rad(to_resample[f'wd_{h}m'])
-        to_resample[f'x_{h}m'], to_resample[f'y_{h}m'] = polar.wind_components(to_resample[f'ws_{h}m'], to_resample[f'wd_{h}m'])
+        dirRad = np.deg2rad(to_resample[f'wd_{int(h)}m'])
+        to_resample[f'x_{int(h)}m'], to_resample[f'y_{int(h)}m'] = polar.wind_components(to_resample[f'ws_{int(h)}m'], to_resample[f'wd_{int(h)}m'])
     
     rsmp = to_resample.resample(window)
     if how == 'mean':
@@ -379,20 +388,20 @@ def resample(df: pd.DataFrame,
 
     for h in all_heights:
         if pti:
-            # Compute pseudo-turbulence intensities 'pti_{h}m' per height as (mean of wind speeds) / (mean wind speed [direct magnitude average])
+            # Compute pseudo-turbulence intensities 'pti_{int(h)}m' per height as (mean of wind speeds) / (mean wind speed [direct magnitude average])
                 # mean wind speed used is that at height `turbulence_reference` (or at local height if turbulence_reference == -1)
             ref = h if (type(turbulence_reference) is not int or turbulence_reference < 0) else turbulence_reference
             if ref not in all_heights:
                 raise Exception(f'preprocess.resample: in pseudo-TI calculation, unrecognized reference height {ref}m')
-            resampled[f'pti_{h}m'] = stds[f'ws_{h}m'] / resampled[f'ws_{ref}m'] # divide by raw average wind speed, before vector averaging
+            resampled[f'pti_{int(h)}m'] = stds[f'ws_{int(h)}m'] / resampled[f'ws_{ref}m'] # divide by raw average wind speed, before vector averaging
         
         # Get maximum wind speed in each interval
-        resampled[f'maxws_{h}m'] = maxs[f'ws_{h}m']
+        resampled[f'maxws_{int(h)}m'] = maxs[f'ws_{int(h)}m']
 
         # Find vector averages
-        resampled[f'ws_{h}m'] = np.sqrt(resampled[f'x_{h}m']**2+resampled[f'y_{h}m']**2)
-        resampled[f'wd_{h}m'] = (np.rad2deg(np.arctan2(resampled[f'x_{h}m'], resampled[f'y_{h}m'])) + 360) % 360
-        resampled.drop(columns=[f'x_{h}m',f'y_{h}m'], inplace=True)
+        resampled[f'ws_{int(h)}m'] = np.sqrt(resampled[f'x_{int(h)}m']**2+resampled[f'y_{int(h)}m']**2)
+        resampled[f'wd_{int(h)}m'] = (np.rad2deg(np.arctan2(resampled[f'x_{int(h)}m'], resampled[f'y_{int(h)}m'])) + 360) % 360
+        resampled.drop(columns=[f'x_{int(h)}m',f'y_{int(h)}m'], inplace=True)
 
     if not silent:
         print(f'preprocess.resample() - resampling into {window_size_minutes} minute intervals ({how}s) complete')
@@ -464,6 +473,22 @@ def flagged_removal(df: pd.DataFrame, flags: str|list[str], silent: bool = False
 
     return result
 
+def rename_headers(df, mapper, drop_nones: bool = True, drop_others: bool = True, drop_empty: bool = True):
+    result = df.copy()
+    for col in result.columns:
+        col_type, height_str = col.split('_')
+        if col_type in mapper:
+            if mapper[col_type] is not None:
+                new = f'{mapper[col_type]}_{height_str}'
+                result.rename(columns = {col : new}, inplace = True)
+            elif drop_nones:
+                result.drop(columns = [col], inplace = True)
+        elif drop_other:
+            result.drop(columns = [col], inplace = True)
+    if drop_empty:
+        result.dropna(axis = 1, how = 'all', inplace = True)
+    return result
+
 def strip_missing_data(df: pd.DataFrame, necessary: list[int], minimum: int = 4, silent: bool = False):
     """
     Remove rows where there are fewer than `minimum` wind speed columns or where
@@ -476,7 +501,7 @@ def strip_missing_data(df: pd.DataFrame, necessary: list[int], minimum: int = 4,
 
     cols = result.columns
 
-    necessarys = [f'ws_{h}m' for h in necessary]
+    necessarys = [f'ws_{int(h)}m' for h in necessary]
     ws_cols = []
     for col in cols:
         if 'ws_' in col:

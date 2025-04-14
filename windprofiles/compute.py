@@ -30,9 +30,9 @@ def virtual_potential_temperatures(df: pd.DataFrame, heights: list[int], *, sile
 
     for h in heights:
 
-        rh_str = f'rh_{h}m'
-        p_str = f'p_{h}m'
-        t_str = f't_{h}m'
+        rh_str = f'rh_{int(h)}m'
+        p_str = f'p_{int(h)}m'
+        t_str = f't_{int(h)}m'
 
         if rh_str in substitutions.keys():
             rh_str = substitutions[rh_str]
@@ -41,16 +41,16 @@ def virtual_potential_temperatures(df: pd.DataFrame, heights: list[int], *, sile
         if t_str in substitutions.keys():
             t_str = substitutions[t_str]
 
-        result[f'vpt_{h}m'] = atmos.vpt_from_3(relative_humidity = result[rh_str],
+        result[f'vpt_{int(h)}m'] = atmos.vpt_from_3(relative_humidity = result[rh_str],
                          barometric_air_pressure = result[p_str],
                          temperature = result[t_str])
         
         if not silent:
-            print(f'\tCompleted computation at height {h}m')
+            print(f'\tCompleted computation at height {int(h)}m')
 
     return result
 
-def environmental_lapse_rate(df: pd.DataFrame, variable: str, heights: list[int, int], *, silent: bool = False) -> pd.DataFrame:
+def environmental_lapse_rate(df: pd.DataFrame, variable: str, heights: list[float, float], *, silent: bool = False) -> pd.DataFrame:
     """
     Approximate environmental lapse rate of a variable between two heights.
     Creates a new column in the dataframe with the results.
@@ -63,10 +63,10 @@ def environmental_lapse_rate(df: pd.DataFrame, variable: str, heights: list[int,
     if type(variable) is not str:
         raise Exception(f'compute.environmental_lapse_rate: invalid variable {variable}')
 
-    h1 = int(min(heights))
-    h2 = int(max(heights))
-    h1_str = f'{variable}_{h1}m'
-    h2_str = f'{variable}_{h2}m'
+    h1 = min(heights)
+    h2 = max(heights)
+    h1_str = f'{variable}_{int(h1)}m'
+    h2_str = f'{variable}_{int(h2)}m'
 
     result = df.copy()
 
@@ -82,7 +82,7 @@ def environmental_lapse_rate(df: pd.DataFrame, variable: str, heights: list[int,
 
     return result
 
-def bulk_richardson_number(df: pd.DataFrame, heights: list[int, int], *, silent: bool = False, gravity: float = STANDARD_GRAVITY) -> pd.DataFrame:
+def bulk_richardson_number(df: pd.DataFrame, heights: list[float, float], *, silent: bool = False, gravity: float = STANDARD_GRAVITY) -> pd.DataFrame:
     """
     Compute bulk Richardson number Ri_bulk using data at two heights.
     Creates a new column in the dataframe with the results. 
@@ -93,11 +93,11 @@ def bulk_richardson_number(df: pd.DataFrame, heights: list[int, int], *, silent:
     if type(heights) not in [list, tuple] or len(heights) != 2 or heights[0] == heights[1]:
         raise Exception(f'compute.environmental_lapse_rate: invalid heights {heights}')
     
-    h_lower = int(min(heights))
-    h_upper = int(max(heights))
+    h_lower = min(heights)
+    h_upper = max(heights)
 
     result = df.copy()
-    result['Ri_bulk'] = result.apply(lambda row : atmos.bulk_richardson_number(row[f'vpt_{h_lower}m'], row[f'vpt_{h_upper}m'], h_lower, h_upper, row[f'ws_{h_lower}m'], row[f'ws_{h_upper}m'], row[f'wd_{h_lower}m'], row[f'wd_{h_upper}m'], gravity = gravity), axis = 1)
+    result['Ri_bulk'] = result.apply(lambda row : atmos.bulk_richardson_number(row[f'vpt_{int(h_lower)}m'], row[f'vpt_{int(h_upper)}m'], h_lower, h_upper, row[f'ws_{int(h_lower)}m'], row[f'ws_{int(h_upper)}m'], row[f'wd_{int(h_lower)}m'], row[f'wd_{int(h_upper)}m'], gravity = gravity), axis = 1)
 
     if not silent:
         print(f'\tCompleted computation between heights {h_lower} and {h_upper}')
@@ -166,7 +166,7 @@ def power_law_fits(df: pd.DataFrame, heights: list[int], minimum_present: int = 
 
 def gusts(df: pd.DataFrame, heights: list[int], silent: bool = False):
     """
-    Uses maxws_{h}m columns to compute raw gust factors gust_{h}m,
+    Uses maxws_{int(h)}m columns to compute raw gust factors gust_{int(h)}m,
     which are max (from resampling) / mean wind speeds, an estimate of the true gust factors
     (higher presample frequency and sample interval length -> better estimate)
     """
@@ -176,7 +176,7 @@ def gusts(df: pd.DataFrame, heights: list[int], silent: bool = False):
     result = df.copy()
 
     for h in heights:
-        result[f'gust_{h}m'] = result[f'maxws_{h}m'] / result[f'ws_{h}m'] # little oopsie if ws_{h}m is 0, but doesn't encounter that
+        result[f'gust_{int(h)}m'] = result[f'maxws_{int(h)}m'] / result[f'ws_{int(h)}m'] # little oopsie if ws_{int(h)}m is 0, but doesn't encounter that
 
     if not silent:
         print(f'\tCompleted gust factor calculations')
@@ -195,7 +195,7 @@ def ti_correction(df: pd.DataFrame, heights: list[int], factor: float, silent: b
     result = df.copy()
     
     for h in heights:
-        result[f'TI_{h}m'] = result[f'pti_{h}m'] * factor
+        result[f'TI_{int(h)}m'] = result[f'pti_{int(h)}m'] * factor
 
     if not silent:
         print(f'\tCompleted TI corrections')
