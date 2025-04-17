@@ -1,8 +1,26 @@
 import windprofiles.sonic as sonic
 import windprofiles.preprocess as preprocess
+import windprofiles.lib.atmos as atmos
+from windprofiles.lib.other import zeropad
+import matplotlib
+matplotlib.use('Qt5Agg')
+import matplotlib.pyplot as plt
+import matplotlib.style as mplstyle
+mplstyle.use('fast')
+from matplotlib.lines import Line2D
+from matplotlib.patches import Patch
+from matplotlib.backend_bases import MouseButton
 import pandas as pd
 import numpy as np
+from datetime import datetime
 from ttu_definitions import *
+
+import warnings
+warnings.filterwarnings('ignore', message = "DataFrame is highly fragmented")
+
+REPROCESS = False
+
+PERIOD = 30 # minutes
 
 WE_RULES = {
     
@@ -11,7 +29,10 @@ WE_RULES = {
 NPROC = 12
 LIMIT = None
 
-def get_datetime_from_filename(filename: str):
+OUTPUT_FILE = f'{OUTPUT_DIRECTORY}/data{PERIOD}min.csv'
+
+def get_datetime_from_filename(filepath: str):
+    filename = filepath.split('/')[-1]
     DATE_STR = filename.split('_')[4]
     YEAR = int(DATE_STR[1:5])
     MONTH = int(DATE_STR[5:7])
@@ -22,40 +43,71 @@ def get_datetime_from_filename(filename: str):
     START_TIME = pd.Timestamp(year = YEAR, month = MONTH, day = DAY, hour = HOUR, minute = MIN, tz = 'UTC')
     return START_TIME
 
-def load_and_format_file(filename):
-    df = pd.read_csv(filename, compression = 'gzip', header = None)
+def load_and_format_file(filename, restrict: bool = False, vars: list = None, booms: list = None):
+    df = pd.read_csv(filename, compression = 'gzip', header = None, engine = 'pyarrow')
     df.rename(columns = {i : SOURCE_HEADERS[i] for i in range(120)}, inplace = True)
-    df = preprocess.rename_headers(df, HEADER_MAP, True, True)
-    remap = {}
-    heights = set()
-    booms = set()
-    for col in df.columns:
-        col_type, boom_number = col.split('_')
-        booms.add(int(boom_number))
-        heights.add(HEIGHTS[int(boom_number)])
-    df.rename(columns = remap, inplace = True)
-    heights_list = list(heights)
-    booms_list = list(booms)
-    heights_list.sort()
-    booms_list.sort()
-    return df, booms_list, heights_list
 
-def process_file(args):
+    if restrict:
+        cols = df.columns
+        df.drop(columns = [col for col in cols if int(col.split('_')[-1]) not in booms])
+        try:
+            restrictmap = {HEADER_MAP_INV[var] : var for var in vars}
+        except:
+            restrictmap = HEADER_MAP
+
+    df = preprocess.rename_headers(df, restrictmap if restrict else HEADER_MAP, True, True)
+
+    if not restrict:
+        boomset = set()
+        for col in df.columns:
+            col_type, boom_number = col.split('_')
+            boomset.add(int(boom_number))
+        booms_list = list(boomset)
+        booms_list.sort()
+
+    return df, booms if restrict else booms_list
+
+def summarize_file(args):
     filepath, rules = args
+
+    df, booms_available = process_file(filepath, rules)
+
     TIMESTAMP = get_datetime_from_filename(filepath).tz_convert(LOCAL_TIMEZONE)
-    df, booms_available, heights_available = load_and_format_file(filepath)
-
-    df = preprocess.convert_dataframe_units(df, from_units = SOURCE_UNITS, gravity = LOCAL_GRAVITY, silent = True)
-
     result = {'time' : TIMESTAMP}
 
-    result |= sonic.get_stats(df, np.mean, '_mean', ['u', 'v', 't', 'ts', 'rh', 'p'])
-    result |= sonic.get_stats(df, np.std, '_std', ['u', 'v'])
+    result |= sonic.get_stats(df, np.mean, '_mean', ['u', 'v', 'w', 't', 'ts', 'vpt', 'rh', 'p'])
+    result |= sonic.get_stats(df, np.std, '_std', ['u', 'v', 'w'])
+
+    for var in ['u','v','w','vpt']: # Get Reynolds deviations
+        for b in booms_available:
+            df[f"{var}'_{b}"] = df[f'{var}_{b}'] - result[f'{var}_{b}_mean']
+    
+    for var in ['u','v','vpt']: # Get vertical fluxes
+        for b in booms_available:
+            df[f"w'{var}'_{b}"] = df[f"w'_{b}"] * df[f"{var}'_{b}"]
+    
+    result |= sonic.get_stats(df, np.mean, '_mean', ["w'u'", "w'v'", "w'vpt'"])
+
+    # h_lowest = min(booms_available)
+    # b_lowest = booms_available.index(h_lowest)
+    
+    # What about aligning to mean wind direction?
 
     return result
 
+def process_file(filepath, rules = None, restrict = False, vars = None, booms = None):
+    df, booms_available = load_and_format_file(filepath, restrict = restrict, vars = vars, booms = booms)
+
+    df = preprocess.convert_dataframe_units(df, from_units = SOURCE_UNITS, gravity = LOCAL_GRAVITY, silent = True)
+
+    if 'vpt' in vars:
+        for b in booms_available:
+            df[f'vpt_{b}'] = df.apply(lambda row : atmos.vpt_from_3(row[f'rh_{b}'], row[f'p_{b}'], row[f't_{b}']), axis = 1)
+
+    return df, booms_available
+
 def process_day(day, rules):
-    return sonic.analyze_directory(path = f'{SOURCE_DIRECTORY}/0{day}',
+    return sonic.analyze_directory(path = f'{SOURCE_DIRECTORY}/{zeropad(day,2)}',
                                       analysis = process_file,
                                       rules = rules,
                                       nproc = NPROC,
@@ -63,8 +115,132 @@ def process_day(day, rules):
                                       limit = LIMIT,
                                       progress = True)
 
+def run_sonic_processing():
+    day_summaries = []
+    for i in range(1, 16):
+        day_summaries.append(process_day(day = i, rules = WE_RULES))
+    period_summary = pd.concat(day_summaries)
+    period_summary.reset_index(names = 'time', inplace = True)
+    period_summary['time'] = pd.to_datetime(period_summary['time'])
+    period_summary.set_index('time', inplace = True)
+    period_summary.sort_index(ascending = True, inplace = True)
+    period_summary.to_csv(OUTPUT_FILE, float_format = '%g') # can use %.{n}g for n-sigfig
+
+def run_computations() -> pd.DataFrame:
+    df = pd.read_csv(OUTPUT_FILE)
+    df['time'] = pd.to_datetime(df['time'])
+    df.set_index('time', inplace = True)
+    
+    return df
+
+def generate_plots(df: pd.DataFrame):
+    for boom in BOOMS_LIST:
+        plt.plot(df.index, df[f't_{boom}_mean'], label = f'Temperature at {HEIGHTS[boom]} meters')
+    plt.legend()
+    plt.show()
+
+# Generate plot of slow data such that we can click on any data point and generate a plot of the underlying sonic data for that variable
+# Start with just scatters
+
+def get_sonic_from_timestamp(ts: datetime, variable: str, boom: int): # with restriction
+    time = ts.astimezone('UTC')
+    daystr = zeropad(str(time.day), 2)
+    for file in os.listdir(f'{SOURCE_DIRECTORY}/{daystr}'):
+        file_ts = get_datetime_from_filename(file)
+        if file_ts == time:# or np.abs(time - file_ts) < epsilon:
+            return process_file(f'{SOURCE_DIRECTORY}/{daystr}/{file}', restrict = True, vars = [variable], booms = [boom])[0]
+
+def interactive_plot(df, variable, booms):
+    fig, ax = plt.subplots(figsize = (12, 8))
+    x = df.index
+    
+    colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
+
+    booms_by_artists = {}
+    legend_elements = []
+    for b, c in zip(booms, colors):
+        y = df[f'{variable}_{b}_mean']
+        scatter = ax.scatter(x, y, s = 4, picker = True)
+        booms_by_artists[scatter] = b
+        legend_elements.append(Patch(facecolor = c, edgecolor = c, label = f'{FIGVARS[variable]}, boom {b} ({HEIGHTS[b]} m)'))
+
+    artists_from_legend = {}
+    legend = ax.legend(handles = legend_elements, fancybox = True, shadow = True)
+    legend.set_draggable(True)
+
+    for legend_artist, boom_artist in zip(legend.get_patches(), booms_by_artists.keys()):
+        legend_artist.set_picker(True)
+        artists_from_legend[legend_artist] = boom_artist
+
+    ax.set_ylabel(f'{FIGVARS[variable]} ({FIGUNITS[variable]})')
+    ax.set_xlabel('time')
+
+    def onpick(event):
+        artist = event.artist
+        if artist in booms_by_artists.keys():
+            boom = booms_by_artists[artist]
+            timestamp = x[event.ind][0]
+            print(f'Loading sonic {FIGVARS[variable]} data for boom {boom} at {timestamp}')
+            sonic_subplot(get_sonic_from_timestamp(timestamp, variable, boom), variable, boom, timestamp)
+        elif artist in artists_from_legend.keys():
+            boom_artist = artists_from_legend[artist]
+            button = event.mouseevent.button
+            if button == MouseButton.LEFT:
+                visible = not boom_artist.get_visible()
+                boom_artist.set_visible(visible)
+                artist.set_alpha(1.0 if visible else 0.2)
+            elif button == MouseButton.RIGHT:
+                boom_artist.set_visible(True)
+                artist.set_alpha(1.0)
+                for Lart, Bart in artists_from_legend.items():
+                    if Lart != artist:
+                        Bart.set_visible(False)
+                        Lart.set_alpha(0.2)
+            fig.canvas.draw()
+
+    def onkey(event):
+        if event.key == ' ': # Set all visible on spacebar press
+            for Lart, Bart in artists_from_legend.items():
+                Bart.set_visible(True)
+                Lart.set_alpha(1.0)
+            fig.canvas.draw()
+
+    fig.canvas.mpl_connect('pick_event', onpick)
+    fig.canvas.mpl_connect('key_press_event', onkey)
+
+    plt.show()
+
+def sonic_subplot(dfs, variable, boom, time):
+    fig, ax = plt.subplots(figsize = (10, 7))
+
+    ax.plot(dfs.index, dfs[f'{variable}_{boom}'], linewidth = 1)
+
+    ax.set_title(f'{FIGVARS[variable]}, boom {boom} ({HEIGHTS[boom]} meters)')
+    ax.set_xlabel(f'collections since {time}')
+    ax.set_ylabel(f'{FIGVARS[variable]} ({FIGUNITS[variable]})')
+
+    plt.show()
+
+def interact_CLI(df): # DOES NOT CURRENTLY WORK (b/c process w/o summarize doesn't generate) FOR FLUX QUANTITIES 
+    print('Entered interactive plotting mode. Respond to an input with QUIT to exit, HELP to see variables, or TABLE to print data.')
+    while True:
+        user_in = input('Enter name of variable to plot: ').strip().lower()
+        if user_in in FIGVARS.keys():
+            print(f'Plotting {FIGVARS[user_in]}.')
+            interactive_plot(df, user_in, BOOMS_LIST)
+        elif user_in in ['quit', 'exit']:
+            break
+        elif user_in in ['help', 'vars']:
+            print(f'Available variables: {FIGVARS}')
+        elif user_in in ['table', 'df', 'data']:
+            print(df)
+        else:
+            print(f'Unrecognized variable "{user_in}".')
+    
 if __name__ == '__main__':
-    for i in range(1, 8):
-        day_summary = process_day(day = i, rules = WE_RULES)
-        print(day_summary)
-        day_summary.to_csv(f'{OUTPUT_DIRECTORY}/{i}.csv')
+    if REPROCESS:
+        run_sonic_processing()
+
+    df = run_computations()
+
+    interact_CLI(df)

@@ -483,7 +483,7 @@ def rename_headers(df, mapper, drop_nones: bool = True, drop_others: bool = True
                 result.rename(columns = {col : new}, inplace = True)
             elif drop_nones:
                 result.drop(columns = [col], inplace = True)
-        elif drop_other:
+        elif drop_others:
             result.drop(columns = [col], inplace = True)
     if drop_empty:
         result.dropna(axis = 1, how = 'all', inplace = True)

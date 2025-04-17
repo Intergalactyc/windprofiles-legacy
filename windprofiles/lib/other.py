@@ -37,3 +37,13 @@ def test_frame_discrepancy_by_row(df1, df2, silent = False, details = False, exa
 
 def time_to_hours(dt: datetime.datetime):
     return dt.hour + dt.minute / 60 + dt.second / 3600
+
+def zeropad(x, n, left = True):
+    y = str(x)
+    if len(y) < n:
+        if left:
+            return ''.join(['0' for _ in range(n - len(y))]) + y 
+        else: 
+            return y + ''.join(['0' for _ in range(n - len(y))])
+    else:
+        return y
