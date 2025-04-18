@@ -76,6 +76,7 @@ def bulk_richardson_number(vpt_lower: float, vpt_upper: float,
                            height_lower: float, height_upper: float,
                            ws_lower: float, ws_upper: float,
                            wd_lower: float, wd_upper: float, *,
+                           components: bool = False,
                            gravity = STANDARD_GRAVITY) -> float:
     """
     Compute the bulk Richardson number Ri_bulk using data at two heights
@@ -83,8 +84,14 @@ def bulk_richardson_number(vpt_lower: float, vpt_upper: float,
     delta_vpt = vpt_upper - vpt_lower
     delta_z = height_upper - height_lower
 
-    u_lower, v_lower = wind_components(ws_lower, wd_lower)
-    u_upper, v_upper = wind_components(ws_upper, wd_upper)
+    if components: # instead of ws's pass u's, instead of wd's pass v's
+        u_lower = ws_lower
+        u_upper = ws_upper
+        v_lower = wd_lower
+        v_upper = wd_upper
+    else:
+        u_lower, v_lower = wind_components(ws_lower, wd_lower)
+        u_upper, v_upper = wind_components(ws_upper, wd_upper)
 
     delta_u = u_upper - u_lower
     delta_v = v_upper - v_lower

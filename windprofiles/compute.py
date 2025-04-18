@@ -82,7 +82,7 @@ def environmental_lapse_rate(df: pd.DataFrame, variable: str, booms: list[int, i
 
     return result
 
-def bulk_richardson_number(df: pd.DataFrame, booms: list[int, int], heights: list[float, float], *, silent: bool = False, gravity: float = STANDARD_GRAVITY) -> pd.DataFrame:
+def bulk_richardson_number(df: pd.DataFrame, booms: list[int, int], heights: list[float, float], *, components: bool = False, suffix: str = '', silent: bool = False, gravity: float = STANDARD_GRAVITY, colname = 'Ri_bulk') -> pd.DataFrame:
     """
     Compute bulk Richardson number Ri_bulk using data at two heights.
     Creates a new column in the dataframe with the results. 
@@ -100,7 +100,10 @@ def bulk_richardson_number(df: pd.DataFrame, booms: list[int, int], heights: lis
     b_upper = booms[heights.index(h_upper)]
 
     result = df.copy()
-    result['Ri_bulk'] = result.apply(lambda row : atmos.bulk_richardson_number(row[f'vpt_{b_lower}'], row[f'vpt_{b_upper}'], h_lower, h_upper, row[f'ws_{b_lower}'], row[f'ws_{b_upper}'], row[f'wd_{b_lower}'], row[f'wd_{b_upper}'], gravity = gravity), axis = 1)
+    if components:
+        result[colname] = result.apply(lambda row : atmos.bulk_richardson_number(row[f'vpt_{b_lower}{suffix}'], row[f'vpt_{b_upper}{suffix}'], h_lower, h_upper, row[f'u_{b_lower}{suffix}'], row[f'u_{b_upper}{suffix}'], row[f'v_{b_lower}{suffix}'], row[f'v_{b_upper}{suffix}'], components = True, gravity = gravity), axis = 1)
+    else:
+        result[colname] = result.apply(lambda row : atmos.bulk_richardson_number(row[f'vpt_{b_lower}{suffix}'], row[f'vpt_{b_upper}{suffix}'], h_lower, h_upper, row[f'ws_{b_lower}{suffix}'], row[f'ws_{b_upper}{suffix}'], row[f'wd_{b_lower}{suffix}'], row[f'wd_{b_upper}{suffix}'], gravity = gravity), axis = 1)
 
     if not silent:
         print(f'\tCompleted computation between heights {h_lower} and {h_upper}')
@@ -133,7 +136,7 @@ def classifications(df: pd.DataFrame, *, terrain_classifier: PolarClassifier|Ter
 
     return result
 
-def power_law_fits(df: pd.DataFrame, booms: list[int], heights: list[int], minimum_present: int = 2, columns: list[str, str] = ['beta', 'alpha'], silent: bool = False):
+def power_law_fits(df: pd.DataFrame, booms: list[int], heights: list[int], minimum_present: int = 2, columns: list[str, str] = ['beta', 'alpha'], silent: bool = False, suffix: str = ''):
     """
     Fit power law u(z) = A z ^ B to each timestamp in a dataframe.
     Creates new columns columns[0] and column[1] for the coefficients
@@ -151,7 +154,7 @@ def power_law_fits(df: pd.DataFrame, booms: list[int], heights: list[int], minim
 
     result = df.copy()
 
-    result[['A_PRIMITIVE', 'B_PRIMITIVE']] = result.apply(lambda row : stats.power_fit(heights, [row[f'ws_{b}'] for b in booms], require = minimum_present), axis = 1, result_type='expand')
+    result[['A_PRIMITIVE', 'B_PRIMITIVE']] = result.apply(lambda row : stats.power_fit(heights, [row[f'ws_{b}{suffix}'] for b in booms], require = minimum_present), axis = 1, result_type='expand')
 
     if columns[0] is None:
         result.drop(columns = ['A_PRIMITIVE'], inplace = True)

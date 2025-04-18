@@ -1,6 +1,7 @@
 import windprofiles.sonic as sonic
 import windprofiles.preprocess as preprocess
 import windprofiles.lib.atmos as atmos
+import windprofiles.compute as compute
 from windprofiles.lib.other import zeropad
 import matplotlib
 matplotlib.use('Qt5Agg')
@@ -18,8 +19,6 @@ from ttu_definitions import *
 import warnings
 warnings.filterwarnings('ignore', message = "DataFrame is highly fragmented")
 
-REPROCESS = False
-
 PERIOD = 30 # minutes
 
 WE_RULES = {
@@ -27,7 +26,9 @@ WE_RULES = {
 }
 
 NPROC = 12
-LIMIT = None
+LIMIT = 12
+SHORT = True
+REPROCESS = False
 
 OUTPUT_FILE = f'{OUTPUT_DIRECTORY}/data{PERIOD}min.csv'
 
@@ -67,7 +68,7 @@ def load_and_format_file(filename, restrict: bool = False, vars: list = None, bo
 
     return df, booms if restrict else booms_list
 
-def summarize_file(args):
+def summarize_file(args, df_single_var: str = None):
     filepath, rules = args
 
     df, booms_available = process_file(filepath, rules)
@@ -75,8 +76,7 @@ def summarize_file(args):
     TIMESTAMP = get_datetime_from_filename(filepath).tz_convert(LOCAL_TIMEZONE)
     result = {'time' : TIMESTAMP}
 
-    result |= sonic.get_stats(df, np.mean, '_mean', ['u', 'v', 'w', 't', 'ts', 'vpt', 'rh', 'p'])
-    result |= sonic.get_stats(df, np.std, '_std', ['u', 'v', 'w'])
+    result |= sonic.get_stats(df, np.mean, '_mean', ['u', 'v', 'w', 'ws', 't', 'ts', 'vpt', 'rh', 'p', 'wdDel'])
 
     for var in ['u','v','w','vpt']: # Get Reynolds deviations
         for b in booms_available:
@@ -85,7 +85,11 @@ def summarize_file(args):
     for var in ['u','v','vpt']: # Get vertical fluxes
         for b in booms_available:
             df[f"w'{var}'_{b}"] = df[f"w'_{b}"] * df[f"{var}'_{b}"]
-    
+        if df_single_var == f"w'{var}'":
+            return df
+
+    result |= sonic.get_stats(df, np.std, '_std', ['u', 'v', 'w', 'ws'])
+
     result |= sonic.get_stats(df, np.mean, '_mean', ["w'u'", "w'v'", "w'vpt'"])
 
     # h_lowest = min(booms_available)
@@ -100,15 +104,23 @@ def process_file(filepath, rules = None, restrict = False, vars = None, booms = 
 
     df = preprocess.convert_dataframe_units(df, from_units = SOURCE_UNITS, gravity = LOCAL_GRAVITY, silent = True)
 
-    if 'vpt' in vars:
+    if restrict is False or 'vpt' in vars:
         for b in booms_available:
             df[f'vpt_{b}'] = df.apply(lambda row : atmos.vpt_from_3(row[f'rh_{b}'], row[f'p_{b}'], row[f't_{b}']), axis = 1)
+    
+    if restrict is False or 'ws' in vars:
+        for b in booms_available:
+            df[f'ws_{b}'] = np.sqrt(df[f'u_{b}']**2 + df[f'v_{b}']**2) 
+    # if restrict is False:
+    #     for b in booms_available:
+    #         df[f'wdX_{b}'] = np.rad2deg(np.arctan2(-df[f'v_{b}'], df[f'u_{b}'])) #(np.rad2deg(np.arctan2(df[f'u_{b}'], df[f'v_{b}'])) - 90.) % 360
+    #         df[f'wdDel_{b}'] = df[f'wdX_{b}'] - df[f'wd_{b}']
 
     return df, booms_available
 
 def process_day(day, rules):
     return sonic.analyze_directory(path = f'{SOURCE_DIRECTORY}/{zeropad(day,2)}',
-                                      analysis = process_file,
+                                      analysis = summarize_file,
                                       rules = rules,
                                       nproc = NPROC,
                                       index = 'time',
@@ -117,7 +129,7 @@ def process_day(day, rules):
 
 def run_sonic_processing():
     day_summaries = []
-    for i in range(1, 16):
+    for i in range(1, 2 if SHORT else 16):
         day_summaries.append(process_day(day = i, rules = WE_RULES))
     period_summary = pd.concat(day_summaries)
     period_summary.reset_index(names = 'time', inplace = True)
@@ -130,6 +142,17 @@ def run_computations() -> pd.DataFrame:
     df = pd.read_csv(OUTPUT_FILE)
     df['time'] = pd.to_datetime(df['time'])
     df.set_index('time', inplace = True)
+
+    # bulk Ri between booms 5 and 6 (16.8 and 47.3 meters)
+    df = compute.bulk_richardson_number(df, [5, 6], [16.8, 47.3], silent = True, gravity = LOCAL_GRAVITY, components = True, suffix = '_mean', colname = 'ri_bulk')
+
+    for boom in BOOMS_LIST:
+        df[f'ti_{boom}'] = df[f'ws_{boom}_std'] / df[f'ws_{boom}_mean']
+
+    SAFE_BOOMS = [1,2,3,4,5,6,7,9]
+    SAFE_HEIGHTS = [HEIGHTS[b] for b in SAFE_BOOMS]
+
+    df = compute.power_law_fits(df, SAFE_BOOMS, SAFE_HEIGHTS, 4, [None, 'alpha'], silent = True, suffix = '_mean')
     
     return df
 
@@ -148,7 +171,10 @@ def get_sonic_from_timestamp(ts: datetime, variable: str, boom: int): # with res
     for file in os.listdir(f'{SOURCE_DIRECTORY}/{daystr}'):
         file_ts = get_datetime_from_filename(file)
         if file_ts == time:# or np.abs(time - file_ts) < epsilon:
-            return process_file(f'{SOURCE_DIRECTORY}/{daystr}/{file}', restrict = True, vars = [variable], booms = [boom])[0]
+            if "w'" in variable:
+                return summarize_file((f'{SOURCE_DIRECTORY}/{daystr}/{file}',WE_RULES), variable)
+            else:
+                return process_file(f'{SOURCE_DIRECTORY}/{daystr}/{file}', rules = WE_RULES, restrict = True, vars = [variable], booms = [boom])[0]
 
 def interactive_plot(df, variable, booms):
     fig, ax = plt.subplots(figsize = (12, 8))
@@ -221,6 +247,18 @@ def sonic_subplot(dfs, variable, boom, time):
 
     plt.show()
 
+def normal_plot(df, variable, booms): # right now assume dimless
+    fig, ax = plt.subplots(figsize = (12, 8))
+    if variable == 'ti':
+        for b in booms:
+            ax.scatter(df.index, df[f'ti_{b}'], s = 4, label = f'Boom {b} ({HEIGHTS[b]}m)')
+        ax.legend()
+    else:
+        ax.scatter(df.index, df[variable], s = 5)
+    ax.set_xlabel('Time')
+    ax.set_ylabel(NIFIGVARS[variable])
+    plt.show()
+
 def interact_CLI(df): # DOES NOT CURRENTLY WORK (b/c process w/o summarize doesn't generate) FOR FLUX QUANTITIES 
     print('Entered interactive plotting mode. Respond to an input with QUIT to exit, HELP to see variables, or TABLE to print data.')
     while True:
@@ -228,6 +266,8 @@ def interact_CLI(df): # DOES NOT CURRENTLY WORK (b/c process w/o summarize doesn
         if user_in in FIGVARS.keys():
             print(f'Plotting {FIGVARS[user_in]}.')
             interactive_plot(df, user_in, BOOMS_LIST)
+        elif user_in in NIFIGVARS.keys():
+            normal_plot(df, user_in, BOOMS_LIST)
         elif user_in in ['quit', 'exit']:
             break
         elif user_in in ['help', 'vars']:
