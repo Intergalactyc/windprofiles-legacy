@@ -173,16 +173,19 @@ def get_sonic_from_timestamp(ts: datetime, variable: str, boom: int): # with res
         file_ts = get_datetime_from_filename(file)
         if file_ts == time:# or np.abs(time - file_ts) < epsilon:
             if "w'" in variable:
-                return summarize_file((f'{SOURCE_DIRECTORY}/{daystr}/{file}',WE_RULES), variable)
+                return summarize_file((f'{SOURCE_DIRECTORY}/{daystr}/{file}',WE_RULES), df_single_var = variable)
+            elif variable == "ws":
+                return process_file(f'{SOURCE_DIRECTORY}/{daystr}/{file}', rules = WE_RULES)[0]
             else:
                 return process_file(f'{SOURCE_DIRECTORY}/{daystr}/{file}', rules = WE_RULES, restrict = True, vars = [variable], booms = [boom])[0]
 
 def interactive_plot(df, variable, booms):
     fig, ax = plt.subplots(figsize = (12, 8))
-    x = df.index
-    
-    colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
+    fig.canvas.manager.set_window_title(f'{FIGVARS[variable]} averaged data')
 
+    x = df.index
+
+    colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
     booms_by_artists = {}
     legend_elements = []
     for b, c in zip(booms, colors):
@@ -235,10 +238,11 @@ def interactive_plot(df, variable, booms):
     fig.canvas.mpl_connect('pick_event', onpick)
     fig.canvas.mpl_connect('key_press_event', onkey)
 
-    plt.show()
+    plt.show(block = False)
 
 def sonic_subplot(dfs, variable, boom, time):
     fig, ax = plt.subplots(figsize = (10, 7))
+    fig.canvas.manager.set_window_title(f'Sonic {variable}, boom {boom}, {time}')
 
     ax.plot(dfs.index, dfs[f'{variable}_{boom}'], linewidth = 1)
 
@@ -246,19 +250,70 @@ def sonic_subplot(dfs, variable, boom, time):
     ax.set_xlabel(f'collections since {time}')
     ax.set_ylabel(f'{FIGVARS[variable]} ({FIGUNITS[variable]})')
 
-    plt.show()
+    plt.show(block = False)
 
 def normal_plot(df, variable, booms): # right now assume dimless
     fig, ax = plt.subplots(figsize = (12, 8))
+
+    fig.canvas.manager.set_window_title(f'{NIFIGVARS[variable]} data')
+
     if variable == 'ti':
-        for b in booms:
-            ax.scatter(df.index, df[f'ti_{b}'], s = 4, label = f'Boom {b} ({HEIGHTS[b]}m)')
-        ax.legend()
+        # for b in booms:
+        #     ax.scatter(df.index, df[f'ti_{b}'], s = 4, label = f'Boom {b} ({HEIGHTS[b]}m)')
+        # ax.legend()
+
+        colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
+
+        booms_by_artists = {}
+        legend_elements = []
+        for b, c in zip(booms, colors):
+            y = df[f'ti_{b}']
+            scatter = ax.scatter(df.index, y, s = 4, picker = True)
+            booms_by_artists[scatter] = b
+            legend_elements.append(Patch(facecolor = c, edgecolor = c, label = f'Boom {b} ({HEIGHTS[b]}m)'))
+
+        artists_from_legend = {}
+        legend = ax.legend(handles = legend_elements, fancybox = True, shadow = True)
+        legend.set_draggable(True)
+
+        for legend_artist, boom_artist in zip(legend.get_patches(), booms_by_artists.keys()):
+            legend_artist.set_picker(True)
+            artists_from_legend[legend_artist] = boom_artist
+
+        def onpick(event):
+            artist = event.artist
+            if artist in artists_from_legend.keys():
+                boom_artist = artists_from_legend[artist]
+                button = event.mouseevent.button
+                if button == MouseButton.LEFT:
+                    visible = not boom_artist.get_visible()
+                    boom_artist.set_visible(visible)
+                    artist.set_alpha(1.0 if visible else 0.2)
+                elif button == MouseButton.RIGHT:
+                    boom_artist.set_visible(True)
+                    artist.set_alpha(1.0)
+                    for Lart, Bart in artists_from_legend.items():
+                        if Lart != artist:
+                            Bart.set_visible(False)
+                            Lart.set_alpha(0.2)
+                fig.canvas.draw()
+
+        def onkey(event):
+            if event.key == ' ': # Set all visible on spacebar press
+                for Lart, Bart in artists_from_legend.items():
+                    Bart.set_visible(True)
+                    Lart.set_alpha(1.0)
+                fig.canvas.draw()
+
+        fig.canvas.mpl_connect('pick_event', onpick)
+        fig.canvas.mpl_connect('key_press_event', onkey)
+
     else:
         ax.scatter(df.index, df[variable], s = 5)
+
     ax.set_xlabel('Time')
     ax.set_ylabel(NIFIGVARS[variable])
-    plt.show()
+    plt.show(block = False)
 
 def interact_CLI(df): # DOES NOT CURRENTLY WORK (b/c process w/o summarize doesn't generate) FOR FLUX QUANTITIES 
     print('Entered interactive plotting mode. Respond to an input with QUIT to exit, HELP to see variables, or TABLE to print data.')
