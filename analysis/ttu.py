@@ -19,15 +19,15 @@ from ttu_definitions import *
 import warnings
 warnings.filterwarnings('ignore', message = "DataFrame is highly fragmented")
 
-PERIOD = 30 # minutes
+PERIOD = 30 # minutes, right now does nothing
 
 WE_RULES = {
-    
+    # Right now does nothing
 }
 
 NPROC = 12
-LIMIT = 12
-SHORT = True
+LIMIT = None
+SHORT = False
 REPROCESS = False
 
 OUTPUT_FILE = f'{OUTPUT_DIRECTORY}/data{PERIOD}min.csv'
@@ -138,21 +138,22 @@ def run_sonic_processing():
     period_summary.sort_index(ascending = True, inplace = True)
     period_summary.to_csv(OUTPUT_FILE, float_format = '%g') # can use %.{n}g for n-sigfig
 
-def run_computations() -> pd.DataFrame:
-    df = pd.read_csv(OUTPUT_FILE)
+def run_computations(filename = OUTPUT_FILE, cut = False) -> pd.DataFrame:
+    df = pd.read_csv(filename)
     df['time'] = pd.to_datetime(df['time'])
     df.set_index('time', inplace = True)
 
     # bulk Ri between booms 5 and 6 (16.8 and 47.3 meters)
     df = compute.bulk_richardson_number(df, [5, 6], [16.8, 47.3], silent = True, gravity = LOCAL_GRAVITY, components = True, suffix = '_mean', colname = 'ri_bulk')
 
-    for boom in BOOMS_LIST:
-        df[f'ti_{boom}'] = df[f'ws_{boom}_std'] / df[f'ws_{boom}_mean']
+    if not cut:
+        for boom in BOOMS_LIST:
+            df[f'ti_{boom}'] = df[f'ws_{boom}_std'] / df[f'ws_{boom}_mean']
 
-    SAFE_BOOMS = [1,2,3,4,5,6,7,9]
-    SAFE_HEIGHTS = [HEIGHTS[b] for b in SAFE_BOOMS]
+        SAFE_BOOMS = [1,2,3,4,5,6,7,9]
+        SAFE_HEIGHTS = [HEIGHTS[b] for b in SAFE_BOOMS]
 
-    df = compute.power_law_fits(df, SAFE_BOOMS, SAFE_HEIGHTS, 4, [None, 'alpha'], silent = True, suffix = '_mean')
+        df = compute.power_law_fits(df, SAFE_BOOMS, SAFE_HEIGHTS, 4, [None, 'alpha'], silent = True, suffix = '_mean')
     
     return df
 
@@ -281,6 +282,6 @@ if __name__ == '__main__':
     if REPROCESS:
         run_sonic_processing()
 
-    df = run_computations()
+    df = run_computations(filename = f'{OUTPUT_DIRECTORY}/data{PERIOD}min_past.csv', cut = True)
 
     interact_CLI(df)

@@ -56,8 +56,8 @@ MARKERS = {
     'default2' : 's'
 }
 
-BOOMS = [1, 2, 3, 4, 6]
-HEIGHTS = [6., 10., 20., 32., 106.] # Heights that we are concerned with for plotting, in meters. 80m is left out here.
+BOOMS = [1, 2, 3, 4, 5, 6]
+HEIGHTS = [6., 10., 20., 32., 80., 106.] # Heights that we are concerned with for plotting, in meters. 80m is left out here.
 
 BOOMS_GAPS = [1, 2, 3, 4, 5, 6]
 HEIGHTS_GAPS = [6., 10., 20., 32., 80., 106.] # Every height (HEIGHTS but with 80 as well), for the data gaps visualization
