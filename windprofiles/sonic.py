@@ -9,7 +9,10 @@ def analyze_directory(path: str|os.PathLike, analysis, rules: dict = None, nproc
     # analysis should be a function which takes a single arg (to unpack as `filepath, {rules (if not None)}, <kwargs>`) and returns a dict
     dir_path = os.path.abspath(path)
     if rules is None:
-        directory = [(os.path.join(dir_path, filename), *kwargs) for filename in os.listdir(path)]
+        if len(kwargs) == 0:
+            directory = [os.path.join(dir_path, filename) for filename in os.listdir(path)]
+        else:
+            directory = [(os.path.join(dir_path, filename), *kwargs) for filename in os.listdir(path)]
     else:
         directory = [(os.path.join(dir_path, filename), rules, *kwargs) for filename in os.listdir(path)]
     if limit is not None:

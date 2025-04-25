@@ -84,5 +84,5 @@ HEADER_MAP = {
 HEADER_MAP_INV = {v : k for k, v in HEADER_MAP.items()}
 
 BOOMS_LIST = list(range(1, 11))
-HEIGHTS_LIST = [0.9, 2.4, 4.0, 10.1, 16.8, 47.3, 74.7, 116.5, 118.2, 200.0]
+HEIGHTS_LIST = [0.9, 2.4, 4.0, 10.1, 16.8, 47.3, 74.7, 116.5, 158.2, 200.0]
 HEIGHTS = {b : h for b, h in zip(BOOMS_LIST, HEIGHTS_LIST)}

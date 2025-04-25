@@ -326,9 +326,12 @@ def remove_data(df: pd.DataFrame, periods: dict, silent: bool = False) -> pd.Dat
 
 def rolling_outlier_removal(df: pd.DataFrame,
                             window_size_minutes: int = 30,
+                            window_size_observations: int = None,
                             sigma: int = 5,
                             column_types = ['ws', 't', 'p', 'rh'],
-                            silent: bool = False) -> pd.DataFrame:
+                            silent: bool = False,
+                            remove_if_any: bool = True,
+                            return_elims: bool = False) -> pd.DataFrame:
     """
     Eliminate data where values from columns of types `column_types` are more than
         `sigma` (default 5) standard deviations from a rolling mean, rolling in a
@@ -336,8 +339,8 @@ def rolling_outlier_removal(df: pd.DataFrame,
     Unable to handle wind direction - don't try to apply it to 'wd'.
     """
     result = df.copy(deep = True)
-    window = f'{window_size_minutes}min'
-    eliminations = 0
+    window = f'{window_size_minutes}min' if window_size_observations is None else window_size_observations
+    eliminations = 0 if remove_if_any else dict()
 
     for column in result.columns:
         column_type = column.split('_')[0]
@@ -346,12 +349,22 @@ def rolling_outlier_removal(df: pd.DataFrame,
             rolling_std = result[column].rolling(window = window).std()
             threshold = sigma * rolling_std
             outliers = np.abs(result[column] - rolling_mean) > threshold
-            eliminations += result[outliers].shape[0]
-            result = result[~outliers]
+            if remove_if_any:
+                eliminations += result[outliers].shape[0]
+                result = result[~outliers]
+            else:
+                eliminations[column] = result[outliers].shape[0]
+                result.loc[outliers, column] = pd.NA
     
     if not silent:
         print('preprocess.rolling_outlier_removal() - outlier removal complete')
-        print(f'\t{eliminations} outliers eliminated ({100*eliminations/(df.shape[0]):.4f}%)')
+        if remove_if_any:
+            print(f'\t{eliminations} outliers eliminated ({100*eliminations/(df.shape[0]):.4f}%)')
+        else:
+            print(f'Eliminations summary:\n{eliminations}')
+    
+    if return_elims:
+        return result, eliminations
     
     return result
 
