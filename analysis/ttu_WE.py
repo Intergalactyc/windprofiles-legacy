@@ -1,5 +1,6 @@
 import windprofiles.sonic as sonic
 import windprofiles.preprocess as preprocess
+import windprofiles.lib.polar as polar
 from windprofiles.lib.other import zeropad
 import pandas as pd
 import numpy as np
@@ -64,8 +65,6 @@ DROP_BOOMS = [8, 10]
 OUTLIER_REMOVAL_WINDOW = 60*50*5 # records; = 5 minutes
 OUTLIER_REMOVAL_SIGMA = 5
 
-OUTPUT_FILE = f'{OUTPUT_DIRECTORY}/data30min.csv'
-
 def get_datetime_from_filename(filepath: str):
     filename = filepath.split('/')[-1]
     DATE_STR = filename.split('_')[4]
@@ -104,7 +103,7 @@ def summarize_file(filepath):
     TIMESTAMP = get_datetime_from_filename(filepath).tz_convert(LOCAL_TIMEZONE)
     result = {'time' : TIMESTAMP}
 
-    result |= sonic.get_stats(df, np.mean, '', ['u', 'v', 'wd', 't', 'ts', 'rh', 'p'])
+    result |= sonic.get_stats(df, np.mean, '', ['u', 'v', 't', 'ts', 'rh', 'p', 'wd'])
 
     return result
 
@@ -123,10 +122,9 @@ def process_file(filepath):
                                             remove_if_any = False,
                                             return_elims = True)
     
-    print(elims)
     for key, val in elims.items():
-        if val > 50*60*30*0.01:
-            print(f'For {filepath}, more than 1% ({val}) of {key} removed as spikes')
+        if val > 50*60*30*0.02:
+            print(f'For {filepath}, more than 2% ({val}) of {key} removed as spikes')
 
     return df, booms_available
 
@@ -139,15 +137,13 @@ def process_day(day: int, short: bool = False):
                                       progress = True)
 
 def run_sonic_processing(short: bool = False):
-    day_summaries = []
     for i in range(1, 2 if short else 8):
-        day_summaries.append(process_day(day = i, short = short))
-    period_summary = pd.concat(day_summaries)
-    period_summary.reset_index(names = 'time', inplace = True)
-    period_summary['time'] = pd.to_datetime(period_summary['time'])
-    period_summary.set_index('time', inplace = True)
-    period_summary.sort_index(ascending = True, inplace = True)
-    period_summary.to_csv(OUTPUT_FILE, float_format = '%g') # can use %.{n}g for n-sigfig
+        day_summary = process_day(day = i, short = short)
+        day_summary.reset_index(names = 'time', inplace = True)
+        day_summary['time'] = pd.to_datetime(day_summary['time'])
+        day_summary.set_index('time', inplace = True)
+        day_summary.sort_index(ascending = True, inplace = True) # in case multiprocessing put it out of order
+        day_summary.to_csv(f'{OUTPUT_DIRECTORY}/2018Dec{zeropad(i,2)}_30min.csv', float_format = '%g')
 
 if __name__ == '__main__':
     import sys
