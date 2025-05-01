@@ -17,6 +17,8 @@ from kcc_definitions import LATITUDE, LONGITUDE
 
 ROSE_BOOM = 2
 
+neatline = False
+
 COLORS_POSTER = {
     'open' : '#1f77b4',
     'complex' : '#ff7f0e',
@@ -56,8 +58,8 @@ MARKERS = {
     'default2' : 's'
 }
 
-BOOMS = [1, 2, 3, 4, 5, 6]
-HEIGHTS = [6., 10., 20., 32., 80., 106.] # Heights that we are concerned with for plotting, in meters. 80m is left out here.
+BOOMS = [1, 2, 3, 4, 6]
+HEIGHTS = [6., 10., 20., 32., 106.] # Heights that we are concerned with for plotting, in meters. 80m is left out here.
 
 BOOMS_GAPS = [1, 2, 3, 4, 5, 6]
 HEIGHTS_GAPS = [6., 10., 20., 32., 80., 106.] # Every height (HEIGHTS but with 80 as well), for the data gaps visualization
@@ -97,7 +99,7 @@ CORRELATION_VARIABLES = [f'ws_{b}' for b in BOOMS_GAPS] + [f't_{b}' for b in BOO
 
 def bar_stability(df, cid, summary, size, saveto, poster, details):
     COLORS = COLORS_POSTER if poster else COLORS_FORMAL
-    fig, ax = plt.subplots(figsize = size, linewidth = 5*poster, edgecolor = 'k')
+    fig, ax = plt.subplots(figsize = size, linewidth = 5*poster*neatline, edgecolor = 'k')
     stability_percents = 100 * df['stability'].value_counts(normalize = True)
     if summary['stability_classes'] == 4:
         ax.bar(
@@ -121,12 +123,12 @@ def bar_stability(df, cid, summary, size, saveto, poster, details):
         ax.set_title('Frequency of Wind Data Sorted by \nBulk Richardson Number Thermal Stability Classification')
     ax.set_ylabel('Proportion of Data (%)')
     ax.grid(axis = 'y', linestyle = '-', alpha = 0.75)
-    plt.savefig(saveto, bbox_inches = 'tight', edgecolor = fig.get_edgecolor())
+    plt.savefig(saveto, bbox_inches = 'tight', edgecolor = fig.get_edgecolor(), transparent = poster)
     return
 
 def annual_profiles(df, cid, summary, size, saveto, poster, details):
     COLORS = COLORS_POSTER if poster else COLORS_FORMAL
-    fig, axs = plt.subplots(1, 2, figsize = size, sharey = True, linewidth = 5*poster, edgecolor = 'k')
+    fig, axs = plt.subplots(1, 2, figsize = size, sharey = True, linewidth = 5*poster*neatline, edgecolor = 'k')
     if summary['stability_classes'] == 4:
         stabilities = ['unstable', 'neutral', 'stable', 'strongly stable']
     elif summary['stability_classes'] == 3:
@@ -162,16 +164,16 @@ def annual_profiles(df, cid, summary, size, saveto, poster, details):
 
         if i == 0: ax.set_ylabel('Height (m)')
         if poster:
-            tc_title = (r'Open Terrain (${openL}-{openR}\degree$ at {b})'.format(openL = int(135 - summary['terrain_window_width_degrees']/2), openR = int(135 + summary['terrain_window_width_degrees']/2), h = summary['terrain_wind_height_meters'])
+            tc_title = (r'Open Terrain (${openL}-{openR}\degree$ at {b})'.format(openL = int(135 - summary['terrain_window_width_degrees']/2), openR = int(135 + summary['terrain_window_width_degrees']/2), b = summary['terrain_wind_boom'])
                     if tc == 'open'
-                    else r'Complex Terrain (${complexL}-{complexR}\degree$ at {b})'.format(complexL = int(315 - summary['terrain_window_width_degrees']/2), complexR = int(315 + summary['terrain_window_width_degrees']/2), h = summary['terrain_wind_height_meters'])
+                    else r'Complex Terrain (${complexL}-{complexR}\degree$ at {b})'.format(complexL = int(315 - summary['terrain_window_width_degrees']/2), complexR = int(315 + summary['terrain_window_width_degrees']/2), b = summary['terrain_wind_boom'])
                 )
             ax.set_title(tc_title)
         ax.legend(loc = 'upper left')
     if poster:
         fig.suptitle('Annual Profiles of Wind Speed, by Terrain and Stability')
     fig.tight_layout()
-    plt.savefig(saveto, bbox_inches = 'tight', edgecolor = fig.get_edgecolor())
+    plt.savefig(saveto, bbox_inches = 'tight', edgecolor = fig.get_edgecolor(), transparent = poster)
     return
 
 def wse_histograms(df, cid, summary, size, saveto, poster, details):
@@ -187,7 +189,7 @@ def wse_histograms(df, cid, summary, size, saveto, poster, details):
         size = (size[0] * 1.5, size[1] * 0.7)
     else:
         raise Exception(f"Cannot handle {summary['stability_classes']} stability classes in plot 'wse_histograms'")
-    fig, axs = plt.subplots(nrows, ncols, figsize = size, sharex = (nrows > 1), linewidth = 5*poster, edgecolor = 'k')
+    fig, axs = plt.subplots(nrows, ncols, figsize = size, sharex = (nrows > 1), linewidth = 5*poster*neatline, edgecolor = 'k')
     for i, ax in enumerate(fig.axes):
         sc = stabilities[i]
         dfs = df[df['stability'] == sc]
@@ -224,12 +226,12 @@ def wse_histograms(df, cid, summary, size, saveto, poster, details):
     if poster:
         fig.suptitle(r'Wind Shear Exponent Distributions, by Terrain and Stability')
     fig.tight_layout()
-    plt.savefig(saveto, bbox_inches = 'tight', edgecolor = fig.get_edgecolor())
+    plt.savefig(saveto, bbox_inches = 'tight', edgecolor = fig.get_edgecolor(), transparent = poster)
     return
 
 def veer_profiles(df, cid, summary, size, saveto, poster, details):
     COLORS = COLORS_POSTER if poster else COLORS_FORMAL
-    fig, axs = plt.subplots(1, 2, figsize = size, sharey = True, linewidth = 5*poster, edgecolor = 'k')
+    fig, axs = plt.subplots(1, 2, figsize = size, sharey = True, linewidth = 5*poster*neatline, edgecolor = 'k')
     if summary['stability_classes'] == 4:
         stabilities = ['unstable', 'neutral', 'stable', 'strongly stable']
     elif summary['stability_classes'] == 3:
@@ -256,20 +258,20 @@ def veer_profiles(df, cid, summary, size, saveto, poster, details):
             ax.set_xlim(295, 345)
             ax.legend(loc = 'upper left')
         if poster:
-            tc_title = (r'Open Terrain (${openL}-{openR}\degree$ at {b})'.format(openL = int(135 - summary['terrain_window_width_degrees']/2), openR = int(135 + summary['terrain_window_width_degrees']/2), h = summary['terrain_wind_height_meters'])
+            tc_title = (r'Open Terrain (${openL}-{openR}\degree$ at {b})'.format(openL = int(135 - summary['terrain_window_width_degrees']/2), openR = int(135 + summary['terrain_window_width_degrees']/2), b = summary['terrain_wind_boom'])
                     if tc == 'open'
-                    else r'Complex Terrain (${complexL}-{complexR}\degree$ at {b})'.format(complexL = int(315 - summary['terrain_window_width_degrees']/2), complexR = int(315 + summary['terrain_window_width_degrees']/2), h = summary['terrain_wind_height_meters'])
+                    else r'Complex Terrain (${complexL}-{complexR}\degree$ at {b})'.format(complexL = int(315 - summary['terrain_window_width_degrees']/2), complexR = int(315 + summary['terrain_window_width_degrees']/2), b = summary['terrain_wind_boom'])
                 )
             ax.set_title(tc_title)
     if poster:
         fig.suptitle('Annual Profiles of Wind Direction, by Terrain and Stability')
     fig.tight_layout()
-    plt.savefig(saveto, bbox_inches = 'tight', edgecolor = fig.get_edgecolor())
+    plt.savefig(saveto, bbox_inches = 'tight', edgecolor = fig.get_edgecolor(), transparent = poster)
 
 def tod_wse(df, cid, summary, size, saveto, poster, details):
     OFFSET = 0.15
     COLORS = COLORS_POSTER if poster else COLORS_FORMAL
-    fig, axs = plt.subplots(nrows = summary['stability_classes'], ncols = 1, figsize = size, sharex = True, linewidth = 5*poster, edgecolor = 'k')
+    fig, axs = plt.subplots(nrows = summary['stability_classes'], ncols = 1, figsize = size, sharex = True, linewidth = 5*poster*neatline, edgecolor = 'k')
     if summary['stability_classes'] == 4:
         stabilities = ['unstable', 'neutral', 'stable', 'strongly stable']
     elif summary['stability_classes'] == 3:
@@ -310,7 +312,7 @@ def tod_wse(df, cid, summary, size, saveto, poster, details):
             ax.set_xlabel('Local time (hours)')
     if poster: fig.suptitle('Wind Shear Exponent Medians by Time of Day', y = 1)
     fig.tight_layout()
-    plt.savefig(saveto, bbox_inches = 'tight', edgecolor = fig.get_edgecolor())
+    plt.savefig(saveto, bbox_inches = 'tight', edgecolor = fig.get_edgecolor(), transparent = poster)
     return
 
 def data_gaps(df, cid, summary, size, saveto, poster, details):
@@ -363,7 +365,7 @@ def data_gaps(df, cid, summary, size, saveto, poster, details):
 
 def terrain_breakdown(df, cid, summary, size, saveto, poster, details):
     COLORS = COLORS_POSTER if poster else COLORS_FORMAL
-    fig, ax = plt.subplots(figsize = size, linewidth = 5*poster, edgecolor = 'k')
+    fig, ax = plt.subplots(figsize = size, linewidth = 5*poster*neatline, edgecolor = 'k')
     breakdown, proportions = get_monthly_breakdown(df, 'terrain')
     last = pd.Series(np.zeros(12, dtype = int))
     for tc in ['open', 'complex', 'other']:
@@ -379,9 +381,9 @@ def terrain_breakdown(df, cid, summary, size, saveto, poster, details):
     ax.set_xlabel('Month')
     ax.set_ylabel('Number of Data Points')
     ax.legend(bbox_to_anchor = (0.575,0.975))
-    if poster: fig.suptitle(f'Terrain Breakdown Based on {summary["terrain_wind_height_meters"]}m Wind Directions')
+    if poster: fig.suptitle(f'Terrain Breakdown Based on Boom {summary["terrain_wind_boom"]} Wind Directions')
     fig.tight_layout()
-    plt.savefig(saveto, bbox_inches = 'tight', edgecolor = fig.get_edgecolor())
+    plt.savefig(saveto, bbox_inches = 'tight', edgecolor = fig.get_edgecolor(), transparent = poster)
     return
 
 def windrose_comparison(df, cid, summary, size, saveto, poster, details):
@@ -427,7 +429,7 @@ def windrose_comparison(df, cid, summary, size, saveto, poster, details):
 
 def pti_profiles(df, cid, summary, size, saveto, poster, details):
     COLORS = COLORS_POSTER if poster else COLORS_FORMAL
-    fig, axs = plt.subplots(1, 2, figsize = size, sharey = True, linewidth = 5*poster, edgecolor = 'k')
+    fig, axs = plt.subplots(1, 2, figsize = size, sharey = True, linewidth = 5*poster*neatline, edgecolor = 'k')
     if summary['stability_classes'] == 4:
         stabilities = ['unstable', 'neutral', 'stable', 'strongly stable']
     elif summary['stability_classes'] == 3:
@@ -453,19 +455,19 @@ def pti_profiles(df, cid, summary, size, saveto, poster, details):
             ax.set_ylabel('Height (m)')
             ax.legend(loc = 'upper right')
         if poster:
-            tc_title = (r'Open Terrain (${openL}-{openR}\degree$ at {b})'.format(openL = int(135 - summary['terrain_window_width_degrees']/2), openR = int(135 + summary['terrain_window_width_degrees']/2), h = summary['terrain_wind_height_meters'])
+            tc_title = (r'Open Terrain (${openL}-{openR}\degree$ at {b})'.format(openL = int(135 - summary['terrain_window_width_degrees']/2), openR = int(135 + summary['terrain_window_width_degrees']/2), b = summary['terrain_wind_boom'])
                     if tc == 'open'
-                    else r'Complex Terrain (${complexL}-{complexR}\degree$ at {b})'.format(complexL = int(315 - summary['terrain_window_width_degrees']/2), complexR = int(315 + summary['terrain_window_width_degrees']/2), h = summary['terrain_wind_height_meters'])
+                    else r'Complex Terrain (${complexL}-{complexR}\degree$ at {b})'.format(complexL = int(315 - summary['terrain_window_width_degrees']/2), complexR = int(315 + summary['terrain_window_width_degrees']/2), b = summary['terrain_wind_boom'])
                 )
             ax.set_title(tc_title) 
     if poster:
         fig.suptitle(r'Annual Profiles of Turbulence Intensity, by Terrain and Stability')
     fig.tight_layout()
-    plt.savefig(saveto, bbox_inches = 'tight', edgecolor = fig.get_edgecolor())
+    plt.savefig(saveto, bbox_inches = 'tight', edgecolor = fig.get_edgecolor(), transparent = poster)
 
 def speed_distributions(df, cid, summary, size, saveto, poster, details):
     COLORS = COLORS_POSTER if poster else COLORS_FORMAL
-    fig, axs = plt.subplots(nrows = len(HEIGHTS), ncols = 1, sharex = True, figsize = size, linewidth = 5*poster, edgecolor = 'k')
+    fig, axs = plt.subplots(nrows = len(HEIGHTS), ncols = 1, sharex = True, figsize = size, linewidth = 5*poster*neatline, edgecolor = 'k')
 
     N = len(HEIGHTS)
     for i, (b, h) in enumerate(zip(BOOMS, HEIGHTS),1):
@@ -508,12 +510,12 @@ def speed_distributions(df, cid, summary, size, saveto, poster, details):
     if poster:
         fig.suptitle('Wind Speed Distributions with Best-Fit Weibull Curves Overlaid')
     fig.tight_layout()
-    plt.savefig(saveto, bbox_inches = 'tight', edgecolor = fig.get_edgecolor())
+    plt.savefig(saveto, bbox_inches = 'tight', edgecolor = fig.get_edgecolor(), transparent = poster)
     return
 
 def pti_distributions(df, cid, summary, size, saveto, poster, details):
     COLORS = COLORS_POSTER if poster else COLORS_FORMAL
-    fig, axs = plt.subplots(nrows = len(HEIGHTS), ncols = 1, sharex = True, figsize = size, linewidth = 5*poster, edgecolor = 'k')
+    fig, axs = plt.subplots(nrows = len(HEIGHTS), ncols = 1, sharex = True, figsize = size, linewidth = 5*poster*neatline, edgecolor = 'k')
 
     N = len(HEIGHTS)
     for i, (b, h) in enumerate(zip(BOOMS, HEIGHTS),1):
@@ -545,12 +547,12 @@ def pti_distributions(df, cid, summary, size, saveto, poster, details):
     if poster:
         fig.suptitle('Pseudo Turbulence Intensity Distributions by Height')
     fig.tight_layout()
-    plt.savefig(saveto, bbox_inches = 'tight', edgecolor = fig.get_edgecolor())
+    plt.savefig(saveto, bbox_inches = 'tight', edgecolor = fig.get_edgecolor(), transparent = poster)
     return
 
 def pti_vs_wse(df, cid, summary, size, saveto, poster, details):
     COLORS = COLORS_POSTER if poster else COLORS_FORMAL
-    fig, ax = plt.subplots(figsize = size, linewidth = 5*poster, edgecolor = 'k')
+    fig, ax = plt.subplots(figsize = size, linewidth = 5*poster*neatline, edgecolor = 'k')
 
     o_n_mask = (df['stability'] == 'neutral') & (df['terrain'] == 'open')
     o_n_df = df[o_n_mask]
@@ -567,12 +569,12 @@ def pti_vs_wse(df, cid, summary, size, saveto, poster, details):
     ax.set_ylabel(r'$TI$ (106 meters)')
 
     fig.tight_layout()
-    plt.savefig(saveto, bbox_inches = 'tight', edgecolor = fig.get_edgecolor())
+    plt.savefig(saveto, bbox_inches = 'tight', edgecolor = fig.get_edgecolor(), transparent = poster)
     return
 
 def pti_vs_rib(df, cid, summary, size, saveto, poster, details):
     COLORS = COLORS_POSTER if poster else COLORS_FORMAL
-    fig, ax = plt.subplots(figsize = size, linewidth = 5*poster, edgecolor = 'k')
+    fig, ax = plt.subplots(figsize = size, linewidth = 5*poster*neatline, edgecolor = 'k')
 
     ax.scatter(df['Ri_bulk'], df['pti_6'], s = 1, c = COLORS['default1'])
 
@@ -583,12 +585,12 @@ def pti_vs_rib(df, cid, summary, size, saveto, poster, details):
     ax.set_ylabel(r'$\sigma_M/\overline{M}$ (106 meters)')
 
     fig.tight_layout()
-    plt.savefig(saveto, bbox_inches = 'tight', edgecolor = fig.get_edgecolor())
+    plt.savefig(saveto, bbox_inches = 'tight', edgecolor = fig.get_edgecolor(), transparent = poster)
     return
 
 def correlations(df, cid, summary, size, saveto, poster, details):
     COLORS = COLORS_POSTER if poster else COLORS_FORMAL
-    fig, ax = plt.subplots(figsize = size, linewidth = 5*poster, edgecolor = 'k')
+    fig, ax = plt.subplots(figsize = size, linewidth = 5*poster*neatline, edgecolor = 'k')
 
     WHICH = [col for col in CORRELATION_VARIABLES if col in df.columns]
     corrs = get_correlations(df, which = WHICH)
@@ -607,12 +609,12 @@ def correlations(df, cid, summary, size, saveto, poster, details):
         pd.set_option('display.precision',6)
 
     fig.tight_layout()
-    plt.savefig(saveto, bbox_inches = 'tight', edgecolor = fig.get_edgecolor())
+    plt.savefig(saveto, bbox_inches = 'tight', edgecolor = fig.get_edgecolor(), transparent = poster)
     return
 
 def determinations(df, cid, summary, size, saveto, poster, details):
     COLORS = COLORS_POSTER if poster else COLORS_FORMAL
-    fig, ax = plt.subplots(figsize = size, linewidth = 5*poster, edgecolor = 'k')
+    fig, ax = plt.subplots(figsize = size, linewidth = 5*poster*neatline, edgecolor = 'k')
 
     WHICH = [col for col in CORRELATION_VARIABLES if col in df.columns]
     corrs = get_correlations(df, which = WHICH)**2
@@ -631,7 +633,7 @@ def determinations(df, cid, summary, size, saveto, poster, details):
         pd.set_option('display.precision',6)
 
     fig.tight_layout()
-    plt.savefig(saveto, bbox_inches = 'tight', edgecolor = fig.get_edgecolor())
+    plt.savefig(saveto, bbox_inches = 'tight', edgecolor = fig.get_edgecolor(), transparent = poster)
     return
 
 def alpha_corrs(df):
