@@ -373,6 +373,7 @@ def resample(df: pd.DataFrame,
              window_size_minutes: int,
              how: str = 'mean',
              silent: bool = False,
+             drms: bool = False,
              pti: bool = False,
              turbulence_reference: int = -1) -> pd.DataFrame:
     
@@ -394,6 +395,10 @@ def resample(df: pd.DataFrame,
     maxs = rsmp.max()
     if pti:
         stds = rsmp.std()
+    if drms: # directional RMS per height
+        drms_dict = dict()
+        for b in all_booms:
+            drms_dict[b] = rsmp[f'wd_{b}'].agg(polar.directional_rms)
     
     before_drop = resampled.shape[0]
     resampled.dropna(axis = 0, how = 'all', inplace = True)
@@ -407,6 +412,10 @@ def resample(df: pd.DataFrame,
             if ref not in all_booms:
                 raise Exception(f'preprocess.resample: in pseudo-TI calculation, unrecognized reference boom {ref}')
             resampled[f'pti_{b}'] = stds[f'ws_{b}'] / resampled[f'ws_{ref}'] # divide by raw average wind speed, before vector averaging
+        
+        if drms:
+            # Get directional RMS that was computed above
+            resampled[f'drms_{b}'] = drms_dict[b]
         
         # Get maximum wind speed in each interval
         resampled[f'maxws_{b}'] = maxs[f'ws_{b}']

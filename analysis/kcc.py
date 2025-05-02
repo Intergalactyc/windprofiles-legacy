@@ -27,6 +27,8 @@ RULES = {
     'terrain_window_width_degrees' : 60,
     'terrain_wind_boom' : 2,
     'turbulence_method_local' : True, # For finding pseudo-TI (pti). if True, divide by local (at height) mean speed; if False, divide by reference (106m) mean speed
+    'veer_boom_top' : 6,
+    'veer_boom_bottom' : 4,
 }
 
 def load_data(data_directory: str, outer_merges: bool = False):
@@ -142,6 +144,7 @@ def perform_preprocessing(df,
                             window_size_minutes = resampling_window,
                             how = 'mean',
                             all_booms = BOOM_LIST,
+                            drms = True, # do compute directional RMS
                             pti = True, # do compute pseudo-turbulence-intensity (pseudo-TI or pti) as well as max wind speed (gust estimate)
                             turbulence_reference = -1 if turbulence_local else 6) # -1 indicates local
 
@@ -193,6 +196,10 @@ def compute_values(df,
     df = compute.classifications(df = df,
                                  terrain_classifier = terrain_classifier,
                                  stability_classifier = stability_classifier)
+    
+    df = compute.veer(df = df,
+                      booms = [RULES['veer_boom_top'], RULES['veer_boom_bottom']],
+                      colname = f'veer{RULES["veer_boom_top"]}-{RULES["veer_boom_bottom"]}') # + is clockwise turn with height (veer, expect in instability / day), - is counterclockwise (backing, expect in stability / night)
     
     df = compute.ti_correction(df = df,
                                booms = BOOM_LIST,

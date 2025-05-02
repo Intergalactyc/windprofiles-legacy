@@ -16,6 +16,7 @@ import windrose
 from kcc_definitions import LATITUDE, LONGITUDE
 
 ROSE_BOOM = 2
+DRMSBOOM = 6 # Boom number for directional RMS comparison
 
 neatline = False
 
@@ -95,7 +96,7 @@ if GAPS_LINEAR and GAPS_LOGARITHMIC:
     raise('Cannot have both log and linear scale')
 DISTS_BY_TERRAIN = True # Show separate terrain classes in speed_distributions and pti_distributions?
 
-CORRELATION_VARIABLES = [f'ws_{b}' for b in BOOMS_GAPS] + [f't_{b}' for b in BOOMS_GAPS] + [f'p_{b}' for b in BOOMS_GAPS] + [f'rh_{b}' for b in BOOMS_GAPS] + [f'pti_{b}' for b in BOOMS_GAPS] + ['vpt_2', 'vpt_6', 'vpt_lapse', 'alpha', 'Ri_bulk']
+CORRELATION_VARIABLES = [f'ws_{b}' for b in BOOMS_GAPS] + [f't_{b}' for b in BOOMS_GAPS] + [f'p_{b}' for b in BOOMS_GAPS] + [f'rh_{b}' for b in BOOMS_GAPS] + [f'pti_{b}' for b in BOOMS_GAPS] + [f'drms_{b}' for b in BOOMS_GAPS] + ['vpt_2', 'vpt_6', 'vpt_lapse', 'alpha', 'Ri_bulk']
 
 def bar_stability(df, cid, summary, size, saveto, poster, details):
     COLORS = COLORS_POSTER if poster else COLORS_FORMAL
@@ -588,11 +589,27 @@ def pti_vs_rib(df, cid, summary, size, saveto, poster, details):
     plt.savefig(saveto, bbox_inches = 'tight', edgecolor = fig.get_edgecolor(), transparent = poster)
     return
 
+def pti_vs_drms(df, cid, summary, size, saveto, poster, details):
+    COLORS = COLORS_POSTER if poster else COLORS_FORMAL
+    fig, ax = plt.subplots(figsize = size, linewidth = 5*poster*neatline, edgecolor = 'k')
+
+    ax.scatter(df[f'pti_{DRMSBOOM}'], df[f'drms_{DRMSBOOM}'], s = 0.2, c = COLORS['default1'])
+
+    ax.set_xlim(0, 0.175)
+    ax.set_ylim(0, 5)
+
+    ax.set_xlabel(r'$\sigma_M/\overline{{M}}$ ({H} meters)'.format(H = int(HEIGHTS_GAPS[DRMSBOOM-1])))
+    ax.set_ylabel(r'Directional RMS (degrees)')
+
+    fig.tight_layout()
+    plt.savefig(saveto, bbox_inches = 'tight', edgecolor = fig.get_edgecolor(), transparent = poster)
+    return
+
 def correlations(df, cid, summary, size, saveto, poster, details):
     COLORS = COLORS_POSTER if poster else COLORS_FORMAL
     fig, ax = plt.subplots(figsize = size, linewidth = 5*poster*neatline, edgecolor = 'k')
 
-    WHICH = [col for col in CORRELATION_VARIABLES if col in df.columns]
+    WHICH = [col for col in CORRELATION_VARIABLES+[f'veer{summary["veer_boom_top"]}-{summary["veer_boom_bottom"]}'] if col in df.columns]
     corrs = get_correlations(df, which = WHICH)
 
     im = ax.imshow(corrs, cmap = 'seismic', vmin = -1., vmax = 1.)
@@ -616,7 +633,7 @@ def determinations(df, cid, summary, size, saveto, poster, details):
     COLORS = COLORS_POSTER if poster else COLORS_FORMAL
     fig, ax = plt.subplots(figsize = size, linewidth = 5*poster*neatline, edgecolor = 'k')
 
-    WHICH = [col for col in CORRELATION_VARIABLES if col in df.columns]
+    WHICH = [col for col in CORRELATION_VARIABLES+[f'veer{summary["veer_boom_top"]}-{summary["veer_boom_bottom"]}'] if col in df.columns]
     corrs = get_correlations(df, which = WHICH)**2
     
     im = ax.imshow(corrs, cmap = 'plasma', vmin = 0., vmax = 1.)
@@ -670,10 +687,56 @@ def alpha_corrs(df):
 
     return
 
+def veer_histograms(df, cid, summary, size, saveto, poster, details):
+    COLORS = COLORS_POSTER if poster else COLORS_FORMAL
+    if summary['stability_classes'] == 4:
+        stabilities = ['unstable', 'neutral', 'stable', 'strongly stable']
+        nrows = 2
+        ncols = 2
+    elif summary['stability_classes'] == 3:
+        stabilities = ['unstable', 'neutral', 'stable']
+        nrows = 1
+        ncols = 3
+        size = (size[0] * 1.5, size[1] * 0.7)
+    else:
+        raise Exception(f"Cannot handle {summary['stability_classes']} stability classes in plot 'wse_histograms'")
+    fig, axs = plt.subplots(nrows, ncols, figsize = size, sharex = (nrows > 1), linewidth = 5*poster*neatline, edgecolor = 'k')
+    for i, ax in enumerate(fig.axes):
+        sc = stabilities[i]
+        dfs_veer = df.loc[df['stability'] == sc, f'veer{summary["veer_boom_top"]}-{summary["veer_boom_bottom"]}']
+        ax.hist(dfs_veer, bins = 35, density = True, alpha = 0.9, color = COLORS[sc], edgecolor = 'k', range = (-90, 90))
+        mean = dfs_veer.mean()
+        median = dfs_veer.median()
+        std = dfs_veer.std()
+        skew = dfs_veer.skew()
+        textstr = '\n'.join((
+            f'mean: {mean:.2f}',
+            f'median: {median:.2f}',
+            f'stdev: {std:.2f}',
+            f'skew: {skew:.2f}'
+        ))
+        ax.text(0.05, 0.8, textstr, transform = ax.transAxes, verticalalignment = 'top', bbox = dict(boxstyle = 'round', facecolor = 'none', edgecolor = COLORS[sc], linewidth = 2))
+        if details:
+            print(f' {sc}:')
+            print(f'\tMean: {mean:.2f}')
+            print(f'\tMedian: {median:.2f}')
+            print(f'\tStandard deviation: {std:.2f}')
+        if (nrows == 2 and i >= ncols):
+            ax.set_xlabel(r'$\alpha$')
+        if (i+1) % ncols == 1:
+            ax.set_ylabel('Probability Density')
+        ax.set_title(sc.title(), loc = 'left', x = 0.025, y = 0.9125)
+    if poster:
+        fig.suptitle(r'Wind Veer Distributions (\+ for veer, - for backing), by Stability')
+    fig.tight_layout()
+    plt.savefig(saveto, bbox_inches = 'tight', edgecolor = fig.get_edgecolor(), transparent = poster)
+    return
+
 ALL_PLOTS = {
     'bar_stability': ('Stability Frequency Bar Plot', bar_stability, (4,3)),
     'annual_profiles' : ('Annual Wind Profiles with Fits, by Terrain', annual_profiles, (6.5,3)),
     'wse_histograms' : ('Histograms of WSE, by Stability, including Terrain', wse_histograms, (6.5,4.5)),
+    'veer_histograms' : ('Histograms of Wind Veer, by Stability', veer_histograms, (6.5,4.5)),
     'veer_profiles' : ('Wind Direction Profiles, by Terrain', veer_profiles, (6.5,3)),
     'tod_wse' : ('Time of Day Plots of WSE, by Terrain, including Stability & Fits', tod_wse, (6.5,6)),
     'data_gaps' : ('Data Gap Visualization', data_gaps, (6.5,3)),
@@ -684,6 +747,7 @@ ALL_PLOTS = {
     'pti_distributions' : ('Distributions of Pseudo-TI, by Height', pti_distributions, (6.5,6)),
     'pti_vs_wse' : ('106 meter Pseudo-TI vs WSE', pti_vs_wse, (6.5,3)),
     'pti_vs_rib' : ('106 meter Pseudo-TI vs Bulk Ri', pti_vs_rib, (6.5, 3)),
+    'pti_vs_drms' : (f'{int(HEIGHTS_GAPS[DRMSBOOM-1])} meter Pseudo-TI vs Directional RMS', pti_vs_drms, (6.5, 3)),
     'correlations' : ('Correlation Coefficients', correlations, (7,7)),
     'determinations' : ('Determination Coefficients', determinations, (7,7)),
 }

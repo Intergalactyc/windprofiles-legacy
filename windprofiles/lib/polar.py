@@ -65,6 +65,15 @@ def angular_distance(theta, phi, degrees: bool = True):
     d0 = (theta - phi) % mod
     return min(mod-d0, d0)
 
+def signed_angular_distance(theta, phi, degrees: bool = True, reverse: bool = False):
+    flip_sign = -1 if reverse else 1
+    mod = 360 if degrees else 2*np.pi
+    d0 = (theta - phi) % mod
+    d1 = mod - d0
+    if d0 > d1: # If theta is counterclockwise of phi (ASSUMING ANGLES ARE CW CONVENTIONED), sign negative (positive if reverse)
+        return -1 * flip_sign * d1
+    return flip_sign * d0 # If theta is clockwise of phi, sign positive (negative if reverse)
+
 def series_angular_distance(theta, phi, degrees: bool = True):
     """
     Extension of angular_distance to pd.Series and dimension-1 np.Array
@@ -72,3 +81,22 @@ def series_angular_distance(theta, phi, degrees: bool = True):
     mod = 360 if degrees else 2*np.pi    
     d0 = (theta - phi) % mod
     return d0.apply(lambda d : min(mod-d, d))
+
+def series_signed_angular_distance(theta, phi, degrees: bool = True, reverse: bool = False):
+    """
+    Extension of signed_angular_distance to pd.Series and dimension-1 np.Array
+    """
+    flip_sign = -1 if reverse else 1
+    mod = 360 if degrees else 2*np.pi
+    d0 = (theta - phi) % mod
+    return d0.apply(lambda d : flip_sign * -1 * d1 if (d1 := mod - d) < d else flip_sign * d) # A faster application of signed_angular_distance across series
+
+def directional_rms(directions, degrees: bool = True):
+    """
+    Using the Yamartino double-pass method (of Farrugia et al (2009)),
+    compute the RMS of wind direction
+    """
+    mean_direction = unit_average_direction(directions, degrees = degrees)
+    deviations = series_angular_distance(directions, mean_direction)
+    variance = np.mean(deviations * deviations) - (np.mean(deviations))**2
+    return variance**0.5

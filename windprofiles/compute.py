@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import windprofiles.lib.atmos as atmos
 import windprofiles.lib.stats as stats
+import windprofiles.lib.polar as polar
 from windprofiles.classify import TerrainClassifier, PolarClassifier, StabilityClassifier, SingleClassifier
 from warnings import warn
 from windprofiles.lib.atmos import STANDARD_GRAVITY
@@ -58,6 +59,8 @@ def environmental_lapse_rate(df: pd.DataFrame, variable: str, booms: list[int, i
     if not silent:
         print(f'compute.environmental_lapse_rate() - computing lapse rate of {variable}')
 
+    if type(booms) not in [list, tuple] or len(booms) != 2 or booms[0] == booms[1]:
+        raise Exception(f'compute.environmental_lapse_rate: invalid booms {booms}')
     if type(heights) not in [list, tuple] or len(heights) != 2 or heights[0] == heights[1]:
         raise Exception(f'compute.environmental_lapse_rate: invalid heights {heights}')
     if type(variable) is not str:
@@ -90,8 +93,10 @@ def bulk_richardson_number(df: pd.DataFrame, booms: list[int, int], heights: lis
     if not silent:
         print(f'compute.bulk_richardson_number() - computing bulk Ri')
 
+    if type(booms) not in [list, tuple] or len(booms) != 2 or booms[0] == booms[1]:
+        raise Exception(f'compute.bulk_richardson_number: invalid booms {booms}')
     if type(heights) not in [list, tuple] or len(heights) != 2 or heights[0] == heights[1]:
-        raise Exception(f'compute.environmental_lapse_rate: invalid heights {heights}')
+        raise Exception(f'compute.bulk_richardson_number: invalid heights {heights}')
     
     h_lower = min(heights)
     h_upper = max(heights)
@@ -107,6 +112,31 @@ def bulk_richardson_number(df: pd.DataFrame, booms: list[int, int], heights: lis
 
     if not silent:
         print(f'\tCompleted computation between heights {h_lower} and {h_upper}')
+
+    return result
+
+def veer(df: pd.DataFrame, booms: list[int, int], *, suffix: str = '', silent: bool = False, colname = 'veer') -> pd.DataFrame: #
+    """
+    Compute signed veer in wind direction between two booms.
+    If vertical turning is CW, return +, if it is CCW, return -.
+    Creates a new column in the dataframe with the results. 
+    """
+    # May expect large discontinuities when veer is significant
+
+    if not silent:
+        print(f'compute.veer() - computing wind direction veer')
+
+    if type(booms) not in [list, tuple] or len(booms) != 2 or booms[0] == booms[1]:
+        raise Exception(f'compute.veer: invalid booms {booms}')
+    
+    b_lower = min(booms)
+    b_upper = max(booms)
+
+    result = df.copy()
+    result[colname] = polar.series_signed_angular_distance(result[f'wd_{b_upper}'], result[f'wd_{b_lower}'])
+
+    if not silent:
+        print(f'\tCompleted computation between booms {b_lower} and {b_upper}')
 
     return result
 
