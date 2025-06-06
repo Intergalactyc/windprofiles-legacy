@@ -21,7 +21,7 @@ SOURCE_UNITS = {
         't' : 'C',
         'rh' : '%',
         'ws' : 'm/s',
-        'wd' : ['degrees', 'E', 'CW'],
+        'wd' : ['degrees', 'W', 'CW'],
 }
 
 # All heights (in m) that data exists at

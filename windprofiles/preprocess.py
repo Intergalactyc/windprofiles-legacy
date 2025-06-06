@@ -129,11 +129,11 @@ def _convert_direction(series, from_unit):
         match zero.lower():
             case 'n':
                 return series
-            case 'e':
+            case 'w':
                 return (series - 90) % 360
             case 's':
                 return (series - 180) % 360
-            case 'w':
+            case 'e':
                 return (series - 270) % 360
     elif type(zero) in [int, float]:
         # From degrees offset
