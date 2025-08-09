@@ -1,7 +1,18 @@
 WindProfiles: GLWind Wind Profile Characterization
 ====================================
 
+## THIS IS LEGACY CODE
+
+See the following for the current code:
+- [windprofiles](https://github.com/intergalactyc/windprofiles) : the new core package
+- [kcc-windprofiles](https://github.com/intergalactyc/kcc-windprofiles) : KCC 106-meter met tower data analysis
+- [ttu-windprofiles](https://github.com/intergalactyc/ttu-windprofiles) : TTU 200-meter met tower data analysis
+
+***
+
 Author: Elliott Walker (walker.elliott.j@gmail.com)
+
+***
 
 Extension of the old [glwind_codebase](https://github.com/windysensors/glwind_codebase/), focusing on the [wind profile analysis/characterization project](https://engineering.csuohio.edu/glwind_reu/wind-profile-characterization-based-surface-terrain-and-atmospheric-thermal-stability) for the [GLWind program](https://engineering.csuohio.edu/glwind_reu/glwind_reu). Currently being worked on at Texas Tech University as a continuation of work from Summer 2024.
 
