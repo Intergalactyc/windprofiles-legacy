@@ -3,7 +3,7 @@ requires = ["setuptools>=64", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "WindProfiles"
+name = "WindProfilesLegacy"
 version = "0.0.1"
 description = "Wind profile data analysis and characterization related to GLWind project"
 readme = "README.md"
@@ -29,8 +29,8 @@ dependencies = [
 ]
 
 [project.urls]
-Source = "https://github.com/Intergalactyc/WindProfiles"
-Homepage = "https://github.com/Intergalactyc/WindProfiles"
+Source = "https://github.com/Intergalactyc/windprofiles-legacy"
+Homepage = "https://github.com/Intergalactyc/windprofiles-legacy"
 
 [tool.setuptools.packages.find]
 where = ["."]
