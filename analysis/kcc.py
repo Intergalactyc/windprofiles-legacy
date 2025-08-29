@@ -1,3 +1,5 @@
+# ruff: noqa: F403,F405
+
 import pandas as pd
 import numpy as np
 import windprofiles.preprocess as preprocess
@@ -17,7 +19,7 @@ import os
 import glob
 from kcc_definitions import *
 
-PARENTDIR = "C:/Users/22wal/Documents/GLWind"  # If you are not Elliott and this is not the path for you then pass argument -d followed by the correct path when running!
+PARENTDIR = "C:\\Users\\22wal\\Code\\GLWind\\windprofiles-legacy"  # If you are not Elliott and this is not the path for you then pass argument -d followed by the correct path when running!
 
 RULES = {
     "shadowing_width_degrees": 30,
@@ -415,8 +417,8 @@ def save_results(
     summary = rules
     print("Computing validation checksums for summary file")
     summary["_df_chksum"] = dataframe_checksum(df)
-    summary["_storm_chksum"] = dataframe_checksum(storm_events)
-    summary["_cid_chksum"] = dataframe_checksum(cid_data)
+    # summary["_storm_chksum"] = dataframe_checksum(storm_events)
+    # summary["_cid_chksum"] = dataframe_checksum(cid_data)
     summary["_rules_chksum"] = dict_checksum(rules)
     savepath = f"{savedir}/{summary['_rules_chksum']}"
     recentpath = f"{savedir}/recent"
@@ -437,24 +439,32 @@ def save_results(
     df.to_parquet(f"{recentpath}/output.parquet")
     print("Saved main 'output' dataframe as CSV and Parquet")
 
-    storm_events.to_csv(f"{savepath}/storms.csv")
-    storm_events.to_parquet(f"{savepath}/storms.parquet")
-    storm_events.to_csv(f"{recentpath}/storms.csv")
-    storm_events.to_parquet(f"{recentpath}/storms.parquet")
-    print("Saved 'storms' dataframe as CSV and Parquet")
+    if storm_events:
+        storm_events.to_csv(f"{savepath}/storms.csv")
+        storm_events.to_parquet(f"{savepath}/storms.parquet")
+        storm_events.to_csv(f"{recentpath}/storms.csv")
+        storm_events.to_parquet(f"{recentpath}/storms.parquet")
+        print("Saved 'storms' dataframe as CSV and Parquet")
 
-    cid_data.to_csv(f"{savepath}/cid.csv")
-    cid_data.to_parquet(f"{savepath}/cid.parquet")
-    cid_data.to_csv(f"{recentpath}/cid.csv")
-    cid_data.to_parquet(f"{recentpath}/cid.parquet")
-    print("Saved 'cid' dataframe as CSV and Parquet")
+    if cid_data:
+        cid_data.to_csv(f"{savepath}/cid.csv")
+        cid_data.to_parquet(f"{savepath}/cid.parquet")
+        cid_data.to_csv(f"{recentpath}/cid.csv")
+        cid_data.to_parquet(f"{recentpath}/cid.parquet")
+        print("Saved 'cid' dataframe as CSV and Parquet")
 
 
 def load_results(path: str):
 
     df = pd.read_parquet(f"{path}/output.parquet")
-    storm_events = pd.read_parquet(f"{path}/storms.parquet")
-    cid_data = pd.read_parquet(f"{path}/cid.parquet")
+    try:
+        storm_events = pd.read_parquet(f"{path}/storms.parquet")
+    except FileNotFoundError:
+        storm_events = None
+    try:
+        cid_data = pd.read_parquet(f"{path}/cid.parquet")
+    except FileNotFoundError:
+        cid_data = None
 
     with open(f"{path}/summary.json", "r") as f:
         summary = json.load(f)
@@ -467,11 +477,14 @@ def validate_summary(
 ):
     sums = {
         "_df_chksum": dataframe_checksum(df),
-        "_storm_chksum": dataframe_checksum(storm_events),
-        "_cid_chksum": dataframe_checksum(cid_data),
+        "_storm_chksum": dataframe_checksum(storm_events) if storm_events else None,
+        "_cid_chksum": dataframe_checksum(cid_data) if cid_data else None,
     }
-    for name, sum in sums.items():
-        if summary[name] != sum:
+    for name, s in sums.items():
+        if s is None:
+            print(f"(No value for {name})")
+            continue
+        if summary[name] != s:
             print(f"* Invalid checksum {name}")
             return False
     return True
@@ -528,25 +541,24 @@ if __name__ == "__main__":
         sonic_results.to_parquet(f"{PARENTDIR}/results/sonic/sonic.parquet")
         print("END SONIC PROCESSING")
     else:
-        sonic_results = pd.read_parquet(f"{PARENTDIR}/results/sonic/sonic.parquet")
-        print("SONIC set to False, loaded past sonic results.")
+        try:
+            sonic_results = pd.read_parquet(f"{PARENTDIR}/results/sonic/sonic.parquet")
+            print("SONIC set to False, loaded past sonic results.")
+        except FileNotFoundError:
+            print("SONIC set to False and no past sonic results found!")
 
     if RELOAD:
         df = load_data(
-            data_directory=f"{PARENTDIR}/data/KCC_SlowData",
+            data_directory="C:\\Users\\22wal\\Data\\wind\\sync\\KCC_SlowData",
+            # data_directory=f"{PARENTDIR}/data/KCC_SlowData",
             outer_merges=False,
         )  # Will return with default (not time) index, which is good for the storm/weather data
 
-        print("Getting storm events")
-        storm_events = get_storm_events(
-            start_time=START_TIME,
-            end_time=END_TIME,
-            radius=RULES["storm_radius_km"],
-            unit="km",
-        )
+        # print('Getting storm events')
+        # storm_events = get_storm_events(start_time = START_TIME, end_time = END_TIME, radius = RULES['storm_radius_km'], unit = 'km')
 
-        print("Getting weather data")
-        cid_data = get_weather_data(start_time=START_TIME, end_time=END_TIME)
+        # print('Getting weather data')
+        # cid_data = get_weather_data(start_time = START_TIME, end_time = END_TIME)
 
         df.set_index("time", inplace=True)  # Need time index from here on
 
@@ -581,8 +593,8 @@ if __name__ == "__main__":
             resampling_window=RULES[
                 "resampling_window_minutes"
             ],  # Duration, in minutes, of resampling window
-            storm_events=storm_events,
-            weather_data=cid_data,
+            # storm_events=storm_events,
+            # weather_data=cid_data,
             storm_removal=RULES["storm_removal"],  # discard stormy data?
             turbulence_local=RULES[
                 "turbulence_method_local"
@@ -639,8 +651,10 @@ if __name__ == "__main__":
 
         save_results(
             df=df,
-            storm_events=storm_events,
-            cid_data=cid_data,
+            storm_events=None,
+            cid_data=None,
+            # storm_events=storm_events,
+            # cid_data=cid_data,
             rules=RULES,
             savedir=f"{PARENTDIR}/results",
         )
